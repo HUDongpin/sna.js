@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. This is a scientific
 library: **any change that alters numerical results is called out explicitly.**
 
+## 0.1.1 — 2026-07-11
+
+No code or numerical changes.
+
+- Package renamed to **`@peterhudongpin/sna.js`**: the npm registry rejects
+  bare `sna.js` as too similar to existing packages (`sql.js`, `sha.js`,
+  `bn.js`, …). The GitHub project name is unchanged.
+- Added `publishConfig.access: public` and a manually-dispatched
+  `publish.yml` workflow that publishes from CI via npm trusted publishing
+  (OIDC, with provenance).
+
 ## 0.1.0 — 2026-07-11
 
 First public release. Compared to the unpublished 0.0.0 distribution snapshot,

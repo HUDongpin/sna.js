@@ -4,6 +4,8 @@ SNA.js is a TypeScript/JavaScript port of the R [`sna`](https://cran.r-project.o
 
 The goal is not a blind line-by-line translation. The goal is to preserve user-visible semantics, make the algorithms usable in web applications, and **prove parity with the R reference implementation with executable tests** instead of asserting it.
 
+> The npm package is **`@peterhudongpin/sna.js`** (the npm registry reserves bare `sna.js`-style names that are too similar to existing packages). The project itself is simply called SNA.js.
+
 ## Status
 
 **Version 0.1.0 — research preview.**
@@ -15,14 +17,14 @@ The goal is not a blind line-by-line translation. The goal is to preserve user-v
 ## Install
 
 ```bash
-npm install sna.js        # library only; three is NOT pulled in
-npm install three         # only if you use sna.js/visualization/three
+npm install @peterhudongpin/sna.js   # library only; three is NOT pulled in
+npm install three         # only if you use @peterhudongpin/sna.js/visualization/three
 ```
 
 ## Quick start
 
 ```ts
-import { betweenness, degree, gden, geodist, triadCensus } from "sna.js";
+import { betweenness, degree, gden, geodist, triadCensus } from "@peterhudongpin/sna.js";
 
 const graph = [
   [0, 1, 0, 0],
@@ -44,12 +46,12 @@ Like R `sna`, tie **values** are used by default where R uses them (`degree`, `g
 
 ```html
 <script type="module">
-  import { gden } from "https://cdn.jsdelivr.net/npm/sna.js@0.1.0/dist/browser.min.js";
+  import { gden } from "https://cdn.jsdelivr.net/npm/@peterhudongpin/sna.js@0.1.1/dist/browser.min.js";
   console.log(gden([[0, 1], [0, 0]], { mode: "digraph" }));
 </script>
 ```
 
-`sna.js/browser` remains available as a bundler subpath and resolves to the same code as the root entry. Three.js-based 3D helpers stay isolated under `sna.js/visualization/three`; importing the root package never touches Three.js.
+`@peterhudongpin/sna.js/browser` remains available as a bundler subpath and resolves to the same code as the root entry. Three.js-based 3D helpers stay isolated under `@peterhudongpin/sna.js/visualization/three`; importing the root package never touches Three.js.
 
 ## Graph inputs
 
@@ -84,10 +86,10 @@ Common `GraphOptions`:
 
 ## Visualization
 
-Visualization lives outside the core entry so `import "sna.js"` stays lightweight. The 2D entry returns structured drawing data plus an SVG string:
+Visualization lives outside the core entry so `import "@peterhudongpin/sna.js"` stays lightweight. The 2D entry returns structured drawing data plus an SVG string:
 
 ```ts
-import { gplot, plotSociomatrix } from "sna.js/visualization";
+import { gplot, plotSociomatrix } from "@peterhudongpin/sna.js/visualization";
 
 const plot = gplot(graph, { mode: "circle", label: ["A", "B", "C"], displaylabels: true });
 container.innerHTML = plot.svg;
@@ -95,10 +97,10 @@ container.innerHTML = plot.svg;
 
 > **Security note:** `plot.svg` escapes `& < > " '` in labels and attributes, so inserting it into the DOM as above is safe for the generated markup itself. If you post-process or concatenate the SVG string with other user-supplied content, sanitize that content yourself.
 
-The 3D entry imports Three.js only from `sna.js/visualization/three` (requires the optional `three` peer dependency):
+The 3D entry imports Three.js only from `@peterhudongpin/sna.js/visualization/three` (requires the optional `three` peer dependency):
 
 ```ts
-import { gplot3d } from "sna.js/visualization/three";
+import { gplot3d } from "@peterhudongpin/sna.js/visualization/three";
 const result = gplot3d(graph, { mode: "random", seed: "demo" });
 renderer.render(result.scene, result.camera);
 ```

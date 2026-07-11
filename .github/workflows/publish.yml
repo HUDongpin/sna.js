@@ -1,0 +1,39 @@
+name: Publish to npm
+
+# Manually dispatched against a release tag (e.g. v0.2.0):
+#   gh workflow run publish.yml --ref v0.2.0
+# Publishing uses npm trusted publishing (OIDC): configure this repository +
+# workflow as a trusted publisher for @peterhudongpin/sna.js on npmjs.com.
+# No npm token is stored; provenance is attached automatically.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run smoke:examples
+      - run: npm run size:check
+      - name: Verify tag matches package version
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          REF_NAME="${GITHUB_REF_NAME}"
+          if [ "$REF_NAME" != "v$PKG_VERSION" ]; then
+            echo "Ref $REF_NAME does not match package version v$PKG_VERSION" >&2
+            exit 1
+          fi
+      - run: npm publish

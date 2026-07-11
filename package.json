@@ -1,6 +1,6 @@
 {
-  "name": "sna.js",
-  "version": "0.1.0",
+  "name": "@peterhudongpin/sna.js",
+  "version": "0.1.1",
   "description": "A browser-compatible TypeScript/JavaScript port of the R sna social network analysis package.",
   "type": "module",
   "sideEffects": false,
@@ -95,5 +95,8 @@
   },
   "overrides": {
     "esbuild": "^0.28.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
