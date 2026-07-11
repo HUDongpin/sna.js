@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SNA.js Browser Example</title>
+    <style>
+      :root {
+        color: #16201d;
+        background: #f7f8f6;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      main {
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+        gap: 18px;
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 28px;
+        line-height: 1.1;
+      }
+
+      h2 {
+        font-size: 16px;
+      }
+
+      h3 {
+        font-size: 13px;
+      }
+
+      .panel,
+      .tile {
+        border: 1px solid #d8ded7;
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .panel {
+        display: grid;
+        gap: 16px;
+        align-content: start;
+        padding: 18px;
+      }
+
+      .subtle {
+        color: #5f6d66;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      textarea,
+      select {
+        width: 100%;
+        border: 1px solid #c9d2cc;
+        border-radius: 6px;
+        background: #fbfcfb;
+        color: inherit;
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 230px;
+        padding: 12px;
+        resize: vertical;
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      select {
+        height: 36px;
+        padding: 0 10px;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        min-height: 38px;
+        border: 0;
+        border-radius: 6px;
+        padding: 0 14px;
+        background: #106c5a;
+        color: #ffffff;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        border: 1px solid #c9d2cc;
+        background: #ffffff;
+        color: #1d2b26;
+      }
+
+      .results {
+        display: grid;
+        gap: 14px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .tile {
+        padding: 14px;
+      }
+
+      .metric {
+        display: grid;
+        gap: 6px;
+      }
+
+      .metric span {
+        color: #63726b;
+        font-size: 12px;
+      }
+
+      .metric strong {
+        color: #0f5f52;
+        font-size: 24px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid #edf0ed;
+        padding: 7px 8px;
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      th:first-child,
+      td:first-child {
+        text-align: left;
+      }
+
+      th {
+        color: #53615b;
+        font-weight: 750;
+      }
+
+      .error {
+        display: none;
+        border-left: 3px solid #b42318;
+        padding: 10px 12px;
+        background: #fff4f2;
+        color: #8c1d18;
+        font-size: 13px;
+      }
+
+      .error.visible {
+        display: block;
+      }
+
+      @media (max-width: 860px) {
+        main {
+          padding: 14px;
+        }
+
+        .shell,
+        .grid,
+        .metrics {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="shell">
+        <section class="panel">
+          <header>
+            <h1>SNA.js</h1>
+            <p class="subtle">Local small-graph analysis using the browser bundle.</p>
+          </header>
+
+          <div class="controls">
+            <label>
+              Input
+              <select id="input-kind">
+                <option value="matrix">Adjacency matrix</option>
+                <option value="edge-list">Edge list object</option>
+              </select>
+            </label>
+            <label>
+              Mode
+              <select id="mode">
+                <option value="digraph">Directed</option>
+                <option value="graph">Undirected</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            Graph JSON
+            <textarea id="graph-input" spellcheck="false"></textarea>
+          </label>
+
+          <div class="actions">
+            <button id="analyze">Analyze</button>
+            <button class="secondary" id="load-matrix">Matrix sample</button>
+            <button class="secondary" id="load-edge-list">Edge-list sample</button>
+          </div>
+
+          <div class="error" id="error"></div>
+          <p class="subtle">Runs entirely in this page. Current examples target small graphs and the implemented SNA.js API subset.</p>
+        </section>
+
+        <section class="results" aria-live="polite">
+          <div class="metrics" id="metrics"></div>
+          <div class="grid">
+            <article class="tile">
+              <h2>Degree</h2>
+              <table id="degree-table"></table>
+            </article>
+            <article class="tile">
+              <h2>Components</h2>
+              <table id="component-table"></table>
+            </article>
+            <article class="tile">
+              <h2>Graph Stats</h2>
+              <table id="graph-stats-table"></table>
+            </article>
+            <article class="tile">
+              <h2>Shortest Distances</h2>
+              <table id="distance-table"></table>
+            </article>
+            <article class="tile">
+              <h2>Reachability</h2>
+              <table id="reachability-table"></table>
+            </article>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script type="module">
+      import { exampleGraph, runBasicAnalysis } from "./analysis.mjs";
+
+      const samples = {
+        matrix: exampleGraph,
+        "edge-list": {
+          order: 4,
+          directed: true,
+          edges: [
+            [0, 1],
+            [1, 2],
+            [2, 0],
+          ],
+        },
+      };
+
+      const inputKind = document.querySelector("#input-kind");
+      const mode = document.querySelector("#mode");
+      const graphInput = document.querySelector("#graph-input");
+      const error = document.querySelector("#error");
+
+      document.querySelector("#load-matrix").addEventListener("click", () => loadSample("matrix"));
+      document.querySelector("#load-edge-list").addEventListener("click", () => loadSample("edge-list"));
+      document.querySelector("#analyze").addEventListener("click", analyze);
+
+      loadSample("matrix");
+      analyze();
+
+      function loadSample(kind) {
+        inputKind.value = kind;
+        graphInput.value = JSON.stringify(samples[kind], null, 2);
+        if (kind === "edge-list") mode.value = "digraph";
+      }
+
+      function analyze() {
+        try {
+          error.classList.remove("visible");
+          const graph = JSON.parse(graphInput.value);
+          const options = { mode: mode.value };
+          const result = runBasicAnalysis(graph, options);
+          window.__SNA_EXAMPLE_RESULT__ = result;
+          render(result);
+        } catch (cause) {
+          error.textContent = cause instanceof Error ? cause.message : String(cause);
+          error.classList.add("visible");
+        }
+      }
+
+      function render(result) {
+        document.querySelector("#metrics").innerHTML = [
+          metric("Nodes", result.order),
+          metric("Ties", result.ties),
+          metric("Density", formatNumber(result.density)),
+          metric("Reciprocity", formatNumber(result.reciprocity)),
+          metric("Transitivity", formatNumber(result.transitivity)),
+          metric("Isolates", formatList(result.isolates)),
+        ].join("");
+
+        renderTable(
+          "#degree-table",
+          ["Vertex", "Out", "In", "Total", "Closeness", "Betweenness", "Eigenvector", "GS close", "Weak comp size"],
+          result.outdegree.map((value, vertex) => [
+            vertex,
+            value,
+            result.indegree[vertex],
+            result.totalDegree[vertex],
+            formatNumber(result.closeness[vertex]),
+            formatNumber(result.betweenness[vertex]),
+            formatNumber(result.eigenvector[vertex]),
+            formatNumber(result.gilSchmidtCloseness[vertex]),
+            result.componentSizeByVertex[vertex],
+          ]),
+        );
+
+        renderTable(
+          "#component-table",
+          ["Type", "Membership", "Sizes", "Distribution"],
+          [
+            ["Weak", formatList(result.weakComponents.membership), formatList(result.weakComponents.csize), formatList(result.weakComponents.cdist)],
+            ["Strong", formatList(result.strongComponents.membership), formatList(result.strongComponents.csize), formatList(result.strongComponents.cdist)],
+          ],
+        );
+
+        renderTable(
+          "#graph-stats-table",
+          ["Statistic", "Value"],
+          [
+            ["Mutual dyads", result.dyadCensus.mutual],
+            ["Asymmetric dyads", result.dyadCensus.asymmetric],
+            ["Null dyads", result.dyadCensus.nullDyads],
+            ["Missing dyads", result.dyadCensus.missingDyads],
+            ["Mutuality", result.mutuality],
+            ["Dyadic reciprocity", formatNumber(result.reciprocity)],
+            ["Weak transitivity", formatNumber(result.transitivity)],
+            ["Connectedness", formatNumber(result.connectedness)],
+            ["Efficiency", formatNumber(result.efficiency)],
+            ["Hierarchy", formatNumber(result.hierarchy)],
+          ],
+        );
+
+        renderMatrix("#distance-table", result.shortestDistances);
+        renderMatrix("#reachability-table", result.reachability);
+      }
+
+      function metric(label, value) {
+        return `<article class="tile metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(String(value))}</strong></article>`;
+      }
+
+      function renderMatrix(selector, matrix) {
+        const rows = matrix.map((row, index) => [index, ...row.map((value) => (value === Infinity ? "Inf" : value))]);
+        renderTable(selector, ["From", ...matrix.map((_, index) => String(index))], rows);
+      }
+
+      function renderTable(selector, headers, rows) {
+        const head = `<thead><tr>${headers.map((header) => `<th>${escapeHtml(String(header))}</th>`).join("")}</tr></thead>`;
+        const body = `<tbody>${rows
+          .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(String(cell))}</td>`).join("")}</tr>`)
+          .join("")}</tbody>`;
+        document.querySelector(selector).innerHTML = `${head}${body}`;
+      }
+
+      function formatList(values) {
+        return values.length === 0 ? "[]" : `[${values.join(", ")}]`;
+      }
+
+      function formatNumber(value) {
+        return Number.isFinite(value) ? value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") : String(value);
+      }
+
+      function escapeHtml(value) {
+        return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+      }
+    </script>
+  </body>
+</html>
