@@ -1,6 +1,6 @@
 {
   "name": "@peterhudongpin/sna.js",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A browser-compatible TypeScript/JavaScript port of the R sna social network analysis package.",
   "type": "module",
   "sideEffects": false,
@@ -29,6 +29,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./display": {
+      "types": "./dist/display/index.d.ts",
+      "import": "./dist/display/index.js",
+      "require": "./dist/display/index.cjs"
+    },
+    "./compat": {
+      "types": "./dist/compat.d.ts",
+      "import": "./dist/compat.js",
+      "require": "./dist/compat.cjs"
     },
     "./visualization": {
       "types": "./dist/visualization/index.d.ts",

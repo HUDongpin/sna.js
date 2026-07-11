@@ -3,6 +3,32 @@
 All notable changes to this project are documented here. This is a scientific
 library: **any change that alters numerical results is called out explicitly.**
 
+## 0.2.0 — 2026-07-11
+
+### ⚠️ Results changed
+
+- **`netlogit`**: `nullDeviance` now reproduces R exactly. R's `netlogit`
+  calls `glm.fit(x, y, intercept=FALSE)` with the intercept inside `x`, so
+  its null deviance is the empty-model (p = 0.5) deviance `2n·ln 2`, not the
+  intercept-only mean-model deviance the previous release computed. `dfNull`
+  is now `n` for the same reason. Coefficients, standard errors, deviance,
+  and test statistics are unchanged.
+
+### Added
+
+- **Model parity fixtures**: the golden suite now covers `netlm` (classical
+  null: coefficients, t-statistics, p-values exact to 1e-8), `netlogit`
+  (classical null, 1e-5), `lnam` (point estimates and standard errors;
+  R optimizes with BFGS, sna.js with Nelder–Mead, and both land on the same
+  optimum on the fixture problem to ~1e-6), and `bbnam.fixed` with
+  `outmode: "posterior"` (closed-form posterior, exact).
+- **Subpath entries** `@peterhudongpin/sna.js/display` (59 print/summary/plot
+  helpers) and `@peterhudongpin/sna.js/compat` (`snaR`, `onAttach`,
+  `onLoad`). Root re-exports of both remain for compatibility but are now
+  documented as deprecated.
+- **API-surface gate**: every entry point's export list is pinned in
+  `tests/api-surface.json`; unintended additions or removals fail CI.
+
 ## 0.1.1 — 2026-07-11
 
 No code or numerical changes.

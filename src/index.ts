@@ -301,7 +301,20 @@ export type {
   SimmelianOptions,
   StructureStatisticsOptions,
 } from "./algorithms/structural";
+/**
+ * @deprecated Root re-exports of the display helpers are kept for
+ * compatibility with 0.1.x; import from "@peterhudongpin/sna.js/display"
+ * instead. They will be removed from the root entry in a future minor.
+ */
 export * from "./display";
+/**
+ * @deprecated Import from "@peterhudongpin/sna.js/compat" instead; kept at
+ * the root for compatibility with 0.1.x.
+ */
 export { onAttach, onLoad } from "./compat/packageHooks";
 export type { AttachOptions } from "./compat/packageHooks";
+/**
+ * @deprecated Import from "@peterhudongpin/sna.js/compat" instead; kept at
+ * the root for compatibility with 0.1.x.
+ */
 export { snaR } from "./compat/rNames";

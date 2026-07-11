@@ -25,6 +25,13 @@ check("browser.min entry loads", Object.keys(min).length >= 200, `${Object.keys(
 const viz = await import(join(root, "dist/visualization/index.js"));
 check("visualization entry loads", typeof viz.gplot === "function");
 
+const display = await import(join(root, "dist/display/index.js"));
+check("display entry loads", Object.keys(display).length >= 50, `${Object.keys(display).length} exports`);
+
+const compatEsm = await import(join(root, "dist/compat.js"));
+const compatCjs = require(join(root, "dist/compat.cjs"));
+check("compat entries load", typeof compatEsm.snaR === "object" && typeof compatCjs.snaR === "object");
+
 const { runBasicAnalysis } = await import(join(root, "examples/analysis.mjs"));
 const analysis = runBasicAnalysis();
 check("example analysis runs", analysis.order === 4);

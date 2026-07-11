@@ -1782,8 +1782,11 @@ function fitLogisticModel(x: readonly (readonly number[])[], y: readonly number[
   const fittedValues = linearPredictors.map(logistic);
   const residuals = y.map((value, index) => value - fittedValues[index]!);
   const deviance = binomialDeviance(y, fittedValues);
-  const mean = y.reduce((sum, value) => sum + value, 0) / y.length;
-  const nullDeviance = binomialDeviance(y, y.map(() => mean));
+  // R's netlogit runs glm.fit(x, y, intercept=FALSE) with the intercept as a
+  // column of x, so glm.fit's "null" model is the empty model with fitted
+  // probability linkinv(0) = 0.5 (null deviance 2n*ln2), not the
+  // intercept-only mean model. Match R exactly.
+  const nullDeviance = binomialDeviance(y, y.map(() => 0.5));
   const standardErrors = diagonal(covariance).map((value) => (value >= 0 ? Math.sqrt(value) : Number.NaN));
   const zValues = beta.map((coef, index) => coef / standardErrors[index]!);
   const contingencyTable = contingency(fittedValues, y);
@@ -1800,7 +1803,8 @@ function fitLogisticModel(x: readonly (readonly number[])[], y: readonly number[
     dfModel: p,
     deviance,
     nullDeviance,
-    dfNull: n - 1,
+    // glm.fit(intercept=FALSE) leaves all n degrees of freedom in the null.
+    dfNull: n,
     aic: deviance + 2 * p,
     bic: deviance + p * Math.log(n),
     contingencyTable,

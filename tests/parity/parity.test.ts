@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  bbnamFixed,
   betweenness,
   bonpow,
   centralization,
@@ -29,9 +30,12 @@ import {
   infocent,
   isolates,
   kcores,
+  lnam,
   loadcent,
   lubness,
   mutuality,
+  netlm,
+  netlogit,
   nties,
   prestige,
   reachability,
@@ -39,6 +43,7 @@ import {
   symmetrize,
   triadCensus,
   type CentralizationMeasureName,
+  type NetworkRegressionNull,
 } from "../../src/index";
 
 type Tagged = number | "NA" | "NaN" | "Inf" | "-Inf";
@@ -47,9 +52,11 @@ type Value = Tagged | Value[] | { [key: string]: Value };
 interface FixtureCase {
   readonly id: string;
   readonly fn: string;
-  readonly graph: string;
+  readonly graph: string | null;
   readonly options: Record<string, unknown>;
   readonly expected: Value;
+  /** Inline named inputs for cases (models) that don't use a corpus graph. */
+  readonly data?: Record<string, Value>;
 }
 
 interface Fixture {
@@ -76,8 +83,18 @@ function decode(value: Value): unknown {
 const graphs = Object.fromEntries(Object.entries(fixture.graphs).map(([name, m]) => [name, m.map((row) => row.map(decodeNumber))]));
 
 // Per-function relative tolerance; the default suits exact algorithms, the
-// looser entries cover iterative/linear-algebra paths.
-const TOLERANCE: Record<string, number> = { default: 1e-9, evcent: 1e-6, bonpow: 1e-6, infocent: 1e-6 };
+// looser entries cover iterative/linear-algebra paths. lnam differs by
+// optimizer (R BFGS vs sna.js Nelder-Mead), so point estimates are compared
+// coarsely; netlogit differs by IRLS stopping behavior.
+const TOLERANCE: Record<string, number> = {
+  default: 1e-9,
+  evcent: 1e-6,
+  bonpow: 1e-6,
+  infocent: 1e-6,
+  netlm: 1e-8,
+  netlogit: 1e-5,
+  lnam: 0.02,
+};
 
 function expectClose(actual: unknown, expected: unknown, tolerance: number, path: string): void {
   // R cannot distinguish a scalar from a length-1 vector, so fixture scalars
@@ -111,9 +128,47 @@ function expectClose(actual: unknown, expected: unknown, tolerance: number, path
   expect.soft(actual, path).toEqual(expected);
 }
 
-type Runner = (matrix: number[][], options: Record<string, never>) => unknown;
+type Runner = (matrix: number[][], options: Record<string, never>, data: Record<string, unknown>) => unknown;
+
+const asMatrix = (value: unknown): number[][] => value as number[][];
+const asVector = (value: unknown): number[] => value as number[];
 
 const RUNNERS: Record<string, Runner> = {
+  netlm: (_m, o, d) => {
+    const result = netlm(asMatrix(d.y), [asMatrix(d.x1), asMatrix(d.x2)], o as unknown as { nullhyp: NetworkRegressionNull });
+    return {
+      coefficients: result.coefficients,
+      tstat: result.tstat,
+      pGreaterEqualAbs: result.pGreaterEqualAbs,
+      rank: result.rank,
+      n: result.n,
+      dfResidual: result.dfResidual,
+    };
+  },
+  netlogit: (_m, o, d) => {
+    const result = netlogit(asMatrix(d.y), [asMatrix(d.x1), asMatrix(d.x2)], o as unknown as { nullhyp: NetworkRegressionNull });
+    return {
+      coefficients: result.coefficients,
+      se: result.se,
+      tstat: result.tstat,
+      deviance: result.deviance,
+      nullDeviance: result.nullDeviance,
+      dfNull: result.dfNull,
+      dfResidual: result.dfResidual,
+    };
+  },
+  lnam: (_m, _o, d) => {
+    const result = lnam(asVector(d.y), asMatrix(d.x), asMatrix(d.W1));
+    return {
+      beta: result.beta,
+      betaSe: result.betaSe,
+      rho1: result.rho1,
+      rho1Se: result.rho1Se,
+      sigma: result.sigma,
+      lnlikModel: result.lnlikModel,
+    };
+  },
+  bbnamFixed: (_m, o, d) => bbnamFixed([asMatrix(d.r1), asMatrix(d.r2), asMatrix(d.r3)], o),
   degree: (m, o) => degree(m, o),
   gden: (m, o) => gden(m, o),
   nties: (m, o) => nties(m, o),
@@ -176,9 +231,11 @@ describe(`R sna ${fixture.provenance.snaVersion} golden parity (${fixture.cases.
       const runner = RUNNERS[fn];
       it.each(fnCases.map((c) => [c.id, c] as const))("%s", (_id, parityCase) => {
         expect(runner, `no runner registered for fixture fn "${fn}"`).toBeDefined();
-        const matrix = graphs[parityCase.graph];
-        expect(matrix, `unknown corpus graph "${parityCase.graph}"`).toBeDefined();
-        const actual = runner!(matrix!, parityCase.options as Record<string, never>);
+        const usesData = parityCase.data !== undefined;
+        const matrix = usesData ? [] : graphs[parityCase.graph as string];
+        if (!usesData) expect(matrix, `unknown corpus graph "${parityCase.graph}"`).toBeDefined();
+        const data = usesData ? (decode(parityCase.data!) as Record<string, unknown>) : {};
+        const actual = runner!(matrix!, parityCase.options as Record<string, never>, data);
         const expected = decode(parityCase.expected);
         expectClose(actual, expected, TOLERANCE[fn] ?? TOLERANCE.default!, parityCase.id);
       });

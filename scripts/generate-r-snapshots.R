@@ -70,16 +70,18 @@ sanitize <- function(x) {
 cases <- list()
 skipped <- character()
 
-snap <- function(id, fn, graph, options, expr) {
+snap <- function(id, fn, graph, options, expr, data = NULL) {
   value <- tryCatch(expr, error = function(e) e)
   if (inherits(value, "error")) {
     skipped <<- c(skipped, paste0(id, " :: ", conditionMessage(value)))
     return(invisible(NULL))
   }
-  cases[[length(cases) + 1]] <<- list(
+  entry <- list(
     id = id, fn = fn, graph = graph,
     options = options, expected = sanitize(value)
   )
+  if (!is.null(data)) entry$data <- lapply(data, sanitize)
+  cases[[length(cases) + 1]] <<- entry
   invisible(NULL)
 }
 
@@ -342,6 +344,73 @@ snap("centralization/star5sym/betweenness-graph", "centralization", "star5sym",
 snap("centralization/star5sym/closeness-graph", "centralization", "star5sym",
      opts(mode = "graph", measure = "closeness"),
      centralization(graphs$star5sym, closeness, mode = "graph"))
+
+## statistical models -----------------------------------------------------------
+## netlm / netlogit with nullhyp="classical" are deterministic (OLS / IRLS);
+## inputs are generated once here and stored in the fixture so both sides fit
+## exactly the same data.
+set.seed(1001)
+nm <- 12
+mx1 <- matrix(runif(nm * nm), nm, nm); diag(mx1) <- 0
+mx2 <- rgraph(nm, tprob = 0.3)
+mnoise <- matrix(rnorm(nm * nm, 0, 0.5), nm, nm)
+my <- 3 + 2 * mx1 - 1.5 * mx2 + mnoise; diag(my) <- 0
+
+fit_lm <- netlm(my, list(mx1, mx2), nullhyp = "classical")
+snap("netlm/classical", "netlm", NA,
+     opts(nullhyp = "classical", mode = "digraph"),
+     list(coefficients = fit_lm$coefficients, tstat = fit_lm$tstat,
+          pGreaterEqualAbs = fit_lm$pgreqabs, rank = fit_lm$rank,
+          n = fit_lm$n, dfResidual = fit_lm$df.residual),
+     data = list(y = my, x1 = mx1, x2 = mx2))
+
+set.seed(1002)
+meta <- -1 + 2.5 * mx1 - 2 * mx2
+mpy <- 1 / (1 + exp(-meta))
+myb <- matrix(rbinom(nm * nm, 1, as.vector(mpy)), nm, nm); diag(myb) <- 0
+fit_lg <- netlogit(myb, list(mx1, mx2), nullhyp = "classical")
+snap("netlogit/classical", "netlogit", NA,
+     opts(nullhyp = "classical", mode = "digraph"),
+     list(coefficients = fit_lg$coefficients, se = fit_lg$se,
+          tstat = fit_lg$tstat, deviance = fit_lg$deviance,
+          nullDeviance = fit_lg$null.deviance, dfNull = fit_lg$df.null,
+          dfResidual = fit_lg$df.residual),
+     data = list(y = myb, x1 = mx1, x2 = mx2))
+
+## lnam: R optimizes with BFGS, sna.js with Nelder-Mead; point estimates are
+## compared at a looser tolerance in the parity runner.
+set.seed(1003)
+nl <- 30
+mW <- matrix(0, nl, nl)
+for (i in 1:nl) { mW[i, (i %% nl) + 1] <- 1; mW[i, ((i + nl - 2) %% nl) + 1] <- 1 }
+mW <- mW / rowSums(mW)
+mxl <- cbind(rnorm(nl), runif(nl))
+myl <- as.vector(solve(diag(nl) - 0.35 * mW) %*% (mxl %*% c(1.5, -2) + rnorm(nl, 0, 0.8)))
+fit_ln <- lnam(myl, mxl, W1 = mW)
+# lnam returns 1-column matrices for several fields; flatten to vectors.
+snap("lnam/x-w1", "lnam", NA, opts(),
+     list(beta = as.vector(fit_ln$beta), betaSe = as.vector(fit_ln$beta.se),
+          rho1 = as.vector(fit_ln$rho1), rho1Se = as.vector(fit_ln$rho1.se),
+          sigma = as.vector(fit_ln$sigma), lnlikModel = as.vector(fit_ln$lnlik.model)),
+     data = list(y = myl, x = mxl, W1 = mW))
+
+## bbnam.fixed with outmode="posterior" is a closed-form posterior: exact parity.
+set.seed(1004)
+btruth <- rgraph(8, tprob = 0.3)
+breports <- array(dim = c(3, 8, 8))
+for (k in 1:3) {
+  flip <- matrix(runif(64), 8, 8)
+  obs <- btruth
+  obs[btruth == 1 & flip < 0.2] <- 0
+  obs[btruth == 0 & flip < 0.1] <- 1
+  diag(obs) <- 0
+  breports[k, , ] <- obs
+}
+bpost <- bbnam.fixed(breports, nprior = 0.5, em = 0.2, ep = 0.1, outmode = "posterior")
+snap("bbnamFixed/posterior", "bbnamFixed", NA,
+     opts(nprior = 0.5, em = 0.2, ep = 0.1, outmode = "posterior"),
+     bpost,
+     data = list(r1 = breports[1, , ], r2 = breports[2, , ], r3 = breports[3, , ]))
 
 ## ----------------------------------------------------------------- output ----
 fixture <- list(
