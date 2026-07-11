@@ -1,11 +1,12 @@
 // Ported from R sna 2.8: R/nli.R `stresscent`.
 import { makeDenseGraph } from "../core/graph";
+import type { CancellationOptions } from "../core/cancellation";
 import type { GeodistResult, GraphInput, GraphOptions } from "../core/types";
 import { pathCentralityScores } from "./pathCentrality";
 
 export type StressCentralityMode = "directed" | "undirected";
 
-export interface StressCentralityOptions extends GraphOptions {
+export interface StressCentralityOptions extends GraphOptions, CancellationOptions {
   readonly nodes?: readonly number[];
   readonly cmode?: StressCentralityMode;
   readonly tmaxdev?: boolean;

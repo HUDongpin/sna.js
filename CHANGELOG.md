@@ -3,6 +3,34 @@
 All notable changes to this project are documented here. This is a scientific
 library: **any change that alters numerical results is called out explicitly.**
 
+## 0.3.0 — 2026-07-11
+
+No changes to numerical results.
+
+### Added
+
+- **Web Worker adapter** (`@peterhudongpin/sna.js/worker`): a structured-
+  clone-safe protocol over 20 heavy routines with progress events and hard
+  cancellation via worker termination (auto-respawn on the next run). The
+  module self-registers when loaded inside a worker; `executeSnaTask` is
+  exported for other runtimes. Permutation tests accept named statistics
+  (`gcor`/`gscor`/`hdist`, `gtrans`/`gden`/`grecip`/`mutuality`/`hierarchy`).
+  Verified in-browser: see `examples/worker.html`.
+- **Cancellation and progress on the main thread**: `betweenness`,
+  `closeness`, `stresscent`, `loadcent`, `geodist`, `triadCensus`,
+  `qaptest`, `cugtest`, and `cugTest` accept `{ signal, onProgress }`,
+  checked per outer-loop step.
+- **Input-size guard**: dense normalization rejects graph orders above 5000
+  with an actionable error; `setMaxGraphOrder(n)` raises the cap
+  deliberately (review F-012a).
+
+### Changed
+
+- Weighted shortest paths (`geodist`/`betweenness`/... with
+  `ignoreEval: false`) now use a binary-heap Dijkstra instead of an O(n)
+  selection scan per step — same results (parity fixtures unchanged),
+  asymptotically faster on sparse graphs.
+
 ## 0.2.0 — 2026-07-11
 
 ### ⚠️ Results changed

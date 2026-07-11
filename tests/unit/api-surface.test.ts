@@ -12,6 +12,7 @@ import * as display from "../../src/display/index";
 import * as compat from "../../src/compat/index";
 import * as visualization from "../../src/visualization/index";
 import * as visualizationThree from "../../src/visualization/three";
+import * as worker from "../../src/worker/index";
 
 const snapshot = JSON.parse(readFileSync(join(__dirname, "../api-surface.json"), "utf8")) as Record<string, string[]>;
 
@@ -21,6 +22,7 @@ const ENTRIES: Record<string, Record<string, unknown>> = {
   compat,
   visualization,
   "visualization/three": visualizationThree,
+  worker,
 };
 
 describe("public API surface", () => {

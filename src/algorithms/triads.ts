@@ -1,5 +1,6 @@
 // Ported from R sna 2.8: R/gli.R (`triad.census`, `triad.classify`) and src/triads.c.
 import { makeDenseGraph } from "../core/graph";
+import { checkAborted, type CancellationOptions } from "../core/cancellation";
 import type { DenseGraph, GraphInput, GraphOptions } from "../core/types";
 
 export const DIRECTED_TRIAD_CLASSES = [
@@ -38,7 +39,7 @@ export interface UndirectedTriadCensusResult {
 }
 
 export type TriadCensusResult = DirectedTriadCensusResult | UndirectedTriadCensusResult;
-export type TriadOptions = GraphOptions;
+export type TriadOptions = GraphOptions & CancellationOptions;
 
 type MutableDirectedTriadCensusResult = {
   [K in DirectedTriadClass]: number;
@@ -80,7 +81,7 @@ export function triadCensus(input: GraphInput, options: TriadOptions = {}): Tria
 
   if (graph.directed) {
     const out = emptyDirectedTriadCensus();
-    forEachTriad(graph, (i, j, k) => {
+    forEachTriad(graph, options, (i, j, k) => {
       const classIndex = triadClassifyIndex(graph, i, j, k);
       if (classIndex !== null) out[DIRECTED_TRIAD_CLASSES[classIndex]!] += 1;
     });
@@ -88,18 +89,20 @@ export function triadCensus(input: GraphInput, options: TriadOptions = {}): Tria
   }
 
   const out = emptyUndirectedTriadCensus();
-  forEachTriad(graph, (i, j, k) => {
+  forEachTriad(graph, options, (i, j, k) => {
     const classIndex = triadClassifyIndex(graph, i, j, k);
     if (classIndex !== null) out[classIndex as UndirectedTriadClass] += 1;
   });
   return out;
 }
 
-function forEachTriad(graph: DenseGraph, visit: (i: number, j: number, k: number) => void): void {
+function forEachTriad(graph: DenseGraph, options: CancellationOptions, visit: (i: number, j: number, k: number) => void): void {
   for (let i = 0; i < graph.order; i += 1) {
+    checkAborted(options.signal);
     for (let j = i + 1; j < graph.order; j += 1) {
       for (let k = j + 1; k < graph.order; k += 1) visit(i, j, k);
     }
+    options.onProgress?.(i + 1, graph.order);
   }
 }
 

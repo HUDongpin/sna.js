@@ -1,5 +1,6 @@
 // Ported from R sna 2.8: src/nli.c shortest-path accumulation modes shared by `betweenness_R`, `stresscent_R`, and `loadcent_R`.
 import { denseGraphToMatrix, makeDenseGraph } from "../core/graph";
+import { checkAborted, type CancellationOptions } from "../core/cancellation";
 import type { DenseGraph, GeodistResult, GraphInput, GraphOptions } from "../core/types";
 
 export type PathCentralityMeasure =
@@ -13,7 +14,7 @@ export type PathCentralityMeasure =
   | "stress"
   | "load";
 
-export interface PathCentralityOptions extends GraphOptions {
+export interface PathCentralityOptions extends GraphOptions, CancellationOptions {
   readonly nodes?: readonly number[];
   readonly geodistPrecomp?: GeodistResult;
   readonly rescale?: boolean;
@@ -53,8 +54,10 @@ export function pathCentralityScores(input: GraphInput, options: PathCentralityC
   const scores = Array.from({ length: graph.order }, () => 0);
 
   for (let source = 0; source < graph.order; source += 1) {
+    checkAborted(options.signal);
     const paths = precomputed ? sourcePathsFromPrecomputed(precomputed, source) : singleSourcePaths(graph.order, adjacency, source, options.ignoreEval ?? true);
     accumulatePathCentrality(scores, paths, source, options.measure);
+    options.onProgress?.(source + 1, graph.order);
   }
 
   let values = options.divideByTwo ? scores.map((score) => score / 2) : scores;
@@ -175,20 +178,18 @@ function weightedSingleSourcePaths(n: number, adjacency: readonly AdjacentEdge[]
   const predecessors = Array.from({ length: n }, () => [] as number[]);
   const visited = new Uint8Array(n);
   const stack: number[] = [];
+  // Lazy-deletion binary min-heap keyed by tentative distance; stale entries
+  // are skipped on pop. Replaces the previous O(n) selection scan per step.
+  const heap = new DistanceHeap(n);
 
   distances[source] = 0;
   sigma[source] = 1;
+  heap.push(source, 0);
 
-  while (true) {
-    let vertex = -1;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    for (let candidate = 0; candidate < n; candidate += 1) {
-      if (!visited[candidate] && distances[candidate]! < bestDistance) {
-        vertex = candidate;
-        bestDistance = distances[candidate]!;
-      }
-    }
+  for (;;) {
+    const vertex = heap.pop();
     if (vertex === -1) break;
+    if (visited[vertex]) continue;
 
     visited[vertex] = 1;
     stack.push(vertex);
@@ -200,6 +201,7 @@ function weightedSingleSourcePaths(n: number, adjacency: readonly AdjacentEdge[]
         distances[target] = candidateDistance;
         sigma[target] = sigma[vertex]!;
         predecessors[target] = [vertex];
+        heap.push(target, candidateDistance);
       } else if (Math.abs(candidateDistance - distances[target]!) <= EPSILON) {
         sigma[target] = sigma[target]! + sigma[vertex]!;
         predecessors[target]!.push(vertex);
@@ -208,6 +210,64 @@ function weightedSingleSourcePaths(n: number, adjacency: readonly AdjacentEdge[]
   }
 
   return { distances, sigma, predecessors, stack, reachableCount: stack.length };
+}
+
+class DistanceHeap {
+  private vertices: Int32Array;
+  private keys: Float64Array;
+  private size = 0;
+
+  constructor(capacity: number) {
+    this.vertices = new Int32Array(Math.max(4, capacity));
+    this.keys = new Float64Array(Math.max(4, capacity));
+  }
+
+  push(vertex: number, key: number): void {
+    if (this.size === this.vertices.length) {
+      const vertices = new Int32Array(this.size * 2);
+      const keys = new Float64Array(this.size * 2);
+      vertices.set(this.vertices);
+      keys.set(this.keys);
+      this.vertices = vertices;
+      this.keys = keys;
+    }
+    let index = this.size;
+    this.size += 1;
+    while (index > 0) {
+      const parent = (index - 1) >> 1;
+      if (this.keys[parent]! <= key) break;
+      this.vertices[index] = this.vertices[parent]!;
+      this.keys[index] = this.keys[parent]!;
+      index = parent;
+    }
+    this.vertices[index] = vertex;
+    this.keys[index] = key;
+  }
+
+  /** Returns the vertex with the smallest key, or -1 when empty. */
+  pop(): number {
+    if (this.size === 0) return -1;
+    const top = this.vertices[0]!;
+    this.size -= 1;
+    if (this.size > 0) {
+      const vertex = this.vertices[this.size]!;
+      const key = this.keys[this.size]!;
+      let index = 0;
+      for (;;) {
+        const left = 2 * index + 1;
+        if (left >= this.size) break;
+        const right = left + 1;
+        const child = right < this.size && this.keys[right]! < this.keys[left]! ? right : left;
+        if (this.keys[child]! >= key) break;
+        this.vertices[index] = this.vertices[child]!;
+        this.keys[index] = this.keys[child]!;
+        index = child;
+      }
+      this.vertices[index] = vertex;
+      this.keys[index] = key;
+    }
+    return top;
+  }
 }
 
 function normalizePrecomputed(precomputed: GeodistResult | undefined, order: number): GeodistResult | undefined {

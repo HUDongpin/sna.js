@@ -179,6 +179,7 @@
     "sdmat",
     "seLnam",
     "sedist",
+    "setMaxGraphOrder",
     "simmelian",
     "snaR",
     "sr2css",
@@ -324,5 +325,10 @@
     "gplot3dLoop",
     "snaVisualizationThreeR",
     "visualizationThreeR"
+  ],
+  "worker": [
+    "SnaWorkerClient",
+    "createSnaWorker",
+    "executeSnaTask"
   ]
 }

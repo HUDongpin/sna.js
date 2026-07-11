@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SNA.js worker example</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+      progress { width: 100%; height: 1.4rem; }
+      pre { background: #f6f6f6; padding: 0.75rem; overflow-x: auto; }
+      button { font-size: 1rem; padding: 0.4rem 1rem; margin-right: 0.5rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Betweenness in a Web Worker</h1>
+    <p>
+      Runs betweenness centrality on a random 800-vertex digraph off the main
+      thread, with progress reporting and hard cancellation (worker
+      termination). Build the package first (<code>npm run build</code>), then
+      serve the repository root, e.g. <code>python3 -m http.server 4173</code>
+      and open <code>/examples/worker.html</code>.
+    </p>
+    <p>
+      <button id="start">Start</button>
+      <button id="cancel" disabled>Cancel</button>
+    </p>
+    <progress id="bar" max="1" value="0"></progress>
+    <pre id="log">idle</pre>
+
+    <script type="module">
+      import { rgraph } from "../dist/index.js";
+      import { createSnaWorker } from "../dist/worker/index.js";
+
+      const log = (text) => (document.getElementById("log").textContent = text);
+      const bar = document.getElementById("bar");
+      const startButton = document.getElementById("start");
+      const cancelButton = document.getElementById("cancel");
+
+      // The worker loads the same module; inside a worker it self-registers.
+      const client = createSnaWorker(() => new Worker(new URL("../dist/worker/index.js", import.meta.url), { type: "module" }));
+
+      let controller = null;
+
+      startButton.addEventListener("click", async () => {
+        const graph = rgraph(800, { tprob: 0.01, seed: "worker-demo" });
+        controller = new AbortController();
+        startButton.disabled = true;
+        cancelButton.disabled = false;
+        bar.value = 0;
+        log("computing betweenness on n=800 …");
+        const startedAt = performance.now();
+        try {
+          const scores = await client.run(
+            "betweenness",
+            { input: graph },
+            { mode: "digraph" },
+            {
+              signal: controller.signal,
+              onProgress: (done, total) => {
+                bar.value = done / total;
+              },
+            },
+          );
+          const ms = Math.round(performance.now() - startedAt);
+          const top = [...scores.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+          log(`done in ${ms} ms\ntop-5 vertices by betweenness:\n` + top.map(([v, s]) => `  #${v}  ${s.toFixed(1)}`).join("\n"));
+        } catch (error) {
+          log(error.name === "AbortError" ? "cancelled (worker terminated)" : `error: ${error.message}`);
+        } finally {
+          startButton.disabled = false;
+          cancelButton.disabled = true;
+        }
+      });
+
+      cancelButton.addEventListener("click", () => controller?.abort());
+    </script>
+  </body>
+</html>

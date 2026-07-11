@@ -175,9 +175,40 @@ For reproducible research runs, always pass `{ seed: … }` to stochastic functi
 
 </details>
 
+## Workers and cancellation
+
+Heavy routines accept `{ signal, onProgress }` (`betweenness`, `closeness`, `stresscent`, `loadcent`, `geodist`, `triadCensus`, `qaptest`, `cugTest`, ...):
+
+```ts
+const controller = new AbortController();
+betweenness(graph, {
+  mode: "digraph",
+  signal: controller.signal,                      // checked once per source vertex
+  onProgress: (done, total) => update(done / total),
+});
+```
+
+On the main thread a synchronous loop can only observe an abort raised from inside `onProgress` (or a pre-aborted signal). For *real* cancellation, run the routine in a Web Worker via `@peterhudongpin/sna.js/worker` — aborting terminates the worker thread:
+
+```ts
+import { createSnaWorker } from "@peterhudongpin/sna.js/worker";
+
+// The same module self-registers when loaded inside a worker.
+const client = createSnaWorker(() => new Worker(workerUrl, { type: "module" }));
+const controller = new AbortController();
+const scores = await client.run("betweenness", { input: graph }, { mode: "digraph" }, {
+  signal: controller.signal,          // abort -> worker.terminate(), auto-respawn on next run
+  onProgress: (done, total) => bar.value = done / total,
+});
+```
+
+Permutation tests cross the worker boundary with named statistics (`gcor`, `gscor`, `hdist` for `qaptest`; `gtrans`, `gden`, `grecip`, `mutuality`, `hierarchy` for `cugTest`) since functions cannot be structured-cloned. A runnable demo with a progress bar and cancel button lives in [examples/worker.html](./examples/worker.html); `executeSnaTask` is exported for wiring other runtimes (e.g. Node `worker_threads`).
+
+Dense graph normalization refuses orders above 5000 by default (a 50k-vertex matrix would allocate ~25 GB); raise it deliberately with `setMaxGraphOrder(n)`.
+
 ## Performance notes
 
-Most centrality and graph-summary helpers are fine for interactive small-to-medium graphs in the main thread (n=300 sparse: betweenness ≈ 30 ms, geodist ≈ 15 ms, triad census ≈ 100 ms on a laptop). Exhaustive routines (`cliqueCensus`, `kpathCensus`, `kcycleCensus`, exact structural distance, large permutation tests, model fits) grow combinatorially — put them behind explicit UI controls or a Web Worker for user-supplied networks. Dense O(n²) memory is allocated per graph; very large orders (n ≫ 10⁴) are not the target use case.
+Most centrality and graph-summary helpers are fine for interactive small-to-medium graphs in the main thread (n=300 sparse: betweenness ≈ 30 ms, geodist ≈ 15 ms, triad census ≈ 100 ms on a laptop). Exhaustive routines (`cliqueCensus`, `kpathCensus`, `kcycleCensus`, exact structural distance, large permutation tests, model fits) grow combinatorially — put them behind explicit UI controls and the worker adapter for user-supplied networks. Weighted shortest paths use a binary-heap Dijkstra. Dense O(n²) memory is allocated per graph; very large orders (n ≫ 10⁴) are not the target use case.
 
 ## License
 

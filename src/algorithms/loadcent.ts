@@ -1,11 +1,12 @@
 // Ported from R sna 2.8: R/nli.R `loadcent`.
 import { makeDenseGraph } from "../core/graph";
+import type { CancellationOptions } from "../core/cancellation";
 import type { GeodistResult, GraphInput, GraphOptions } from "../core/types";
 import { pathCentralityScores } from "./pathCentrality";
 
 export type LoadCentralityMode = "directed" | "undirected";
 
-export interface LoadCentralityOptions extends GraphOptions {
+export interface LoadCentralityOptions extends GraphOptions, CancellationOptions {
   readonly nodes?: readonly number[];
   readonly cmode?: LoadCentralityMode;
   readonly tmaxdev?: boolean;

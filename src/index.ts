@@ -1,3 +1,4 @@
+export type { CancellationOptions } from "./core/cancellation";
 export type {
   ComponentResult,
   DenseGraph,
@@ -11,7 +12,7 @@ export type {
 } from "./core/types";
 
 export { createNumberMatrix, toNestedMatrix } from "./core/matrix";
-export { denseGraphToMatrix, hasTie, isDenseGraph, isEdgeListInput, isMissingTie, makeDenseGraph, neighbors, tieWeight } from "./core/graph";
+export { denseGraphToMatrix, hasTie, isDenseGraph, isEdgeListInput, isMissingTie, makeDenseGraph, neighbors, setMaxGraphOrder, tieWeight } from "./core/graph";
 export { createSeededRng } from "./core/random";
 export type { RandomOptions, RandomSource } from "./core/random";
 export { betweenness } from "./algorithms/betweenness";

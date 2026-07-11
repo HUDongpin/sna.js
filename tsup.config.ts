@@ -25,6 +25,7 @@ export default defineConfig([
     entry: {
       index: "src/index.ts",
       "display/index": "src/display/index.ts",
+      "worker/index": "src/worker/index.ts",
       "visualization/index": "src/visualization/index.ts",
       "visualization/three": "src/visualization/three.ts",
     },

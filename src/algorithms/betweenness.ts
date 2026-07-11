@@ -1,5 +1,6 @@
 // Ported from R sna 2.8: R/nli.R `betweenness` and src/nli.c `betweenness_R`.
 import { makeDenseGraph } from "../core/graph";
+import type { CancellationOptions } from "../core/cancellation";
 import type { EdgeTuple, GeodistResult, GraphInput, GraphOptions } from "../core/types";
 import { pathCentralityScores, type PathCentralityMeasure } from "./pathCentrality";
 
@@ -13,7 +14,7 @@ export type BetweennessMode =
   | "lengthscaled"
   | "linearscaled";
 
-export interface BetweennessOptions extends GraphOptions {
+export interface BetweennessOptions extends GraphOptions, CancellationOptions {
   readonly nodes?: readonly number[];
   readonly cmode?: BetweennessMode;
   readonly tmaxdev?: boolean;

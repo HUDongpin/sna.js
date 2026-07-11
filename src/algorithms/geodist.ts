@@ -1,10 +1,11 @@
 // Ported from R sna 2.8: R/connectivity.R `geodist` (geodist_R / geodist_val_R).
 import { makeDenseGraph } from "../core/graph";
+import { checkAborted, type CancellationOptions } from "../core/cancellation";
 import { createNumberMatrix } from "../core/matrix";
 import type { GeodistResult, GraphInput, GraphOptions } from "../core/types";
 import { buildAdjacencyLists, singleSourcePaths } from "./pathCentrality";
 
-export interface GeodistOptions extends GraphOptions {
+export interface GeodistOptions extends GraphOptions, CancellationOptions {
   readonly infReplace?: number;
   readonly countPaths?: boolean;
   readonly predecessors?: boolean;
@@ -24,10 +25,12 @@ export function geodist(input: GraphInput, options: GeodistOptions = {}): Geodis
   const predecessorData = options.predecessors ? Array.from({ length: n }, () => [] as number[][]) : undefined;
 
   for (let source = 0; source < n; source += 1) {
+    checkAborted(options.signal);
     const paths = singleSourcePaths(n, adjacency, source, ignoreEval);
     distances[source] = paths.distances;
     counts[source] = paths.sigma;
     if (predecessorData) predecessorData[source] = paths.predecessors;
+    options.onProgress?.(source + 1, n);
   }
 
   if (typeof options.infReplace === "number") {

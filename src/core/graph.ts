@@ -1,6 +1,33 @@
 import type { DenseGraph, EdgeListInput, GraphInput, GraphOptions, MatrixCell, MatrixLike } from "./types";
 import { assertSquareMatrix, toNestedMatrix } from "./matrix";
 
+// Dense normalization allocates O(n^2); guard against accidental huge inputs
+// (a 50k-vertex matrix would allocate ~25 GB). Raise deliberately when needed.
+let maxGraphOrder = 5000;
+
+/**
+ * Set the maximum accepted graph order (vertex count) for dense
+ * normalization and return the previous limit. The default is 5000, which
+ * allocates on the order of 225 MB per graph; raise it explicitly if you
+ * know the host can take it.
+ */
+export function setMaxGraphOrder(limit: number): number {
+  if (!Number.isInteger(limit) || limit < 1) throw new RangeError("maximum graph order must be a positive integer");
+  const previous = maxGraphOrder;
+  maxGraphOrder = limit;
+  return previous;
+}
+
+function assertOrderWithinLimit(order: number): void {
+  if (order > maxGraphOrder) {
+    throw new RangeError(
+      `graph order ${order} exceeds the configured maximum of ${maxGraphOrder}; ` +
+        `dense normalization would allocate ~${Math.round((order * order * 9) / 1e6)} MB. ` +
+        "Call setMaxGraphOrder() to raise the limit deliberately.",
+    );
+  }
+}
+
 export function isDenseGraph(input: GraphInput): input is DenseGraph {
   return typeof input === "object" && input !== null && "kind" in input && input.kind === "dense";
 }
@@ -52,6 +79,7 @@ function denseFromMatrix(
   options: { directed: boolean; loops: boolean; threshold: number; symmetrize: GraphOptions["symmetrize"] },
 ): DenseGraph {
   const n = assertSquareMatrix(matrix);
+  assertOrderWithinLimit(n);
   const weights = new Float64Array(n * n);
   let missing: Uint8Array | undefined;
 
@@ -143,6 +171,7 @@ function denseFromEdgeList(
     return [tail, head, edge[2] ?? 1] as const;
   });
 
+  assertOrderWithinLimit(order);
   const weights = new Float64Array(order * order);
   let missing: Uint8Array | undefined;
   for (const [tail, head, weight] of normalizedEdges) {

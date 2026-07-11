@@ -1,5 +1,6 @@
 // Ported from R sna 2.8: R/gtest.R (`qaptest`, `cugtest`, `cug.test`).
 import { isDenseGraph, isEdgeListInput } from "../core/graph";
+import { checkAborted, type CancellationOptions } from "../core/cancellation";
 import type { GraphInput, GraphMode } from "../core/types";
 import { resolveRandomSource, shuffleInPlace, type RandomOptions, type RandomSource } from "../core/random";
 import { asSociomatrixSna } from "./dataprep";
@@ -19,14 +20,14 @@ export interface GraphTestResult {
   readonly reps: number;
 }
 
-export interface QaptestOptions extends RandomOptions {
+export interface QaptestOptions extends RandomOptions, CancellationOptions {
   readonly reps?: number;
   readonly g1?: number;
   readonly g2?: number;
   readonly statisticOptions?: Record<string, unknown>;
 }
 
-export interface CugtestOptions extends RandomOptions {
+export interface CugtestOptions extends RandomOptions, CancellationOptions {
   readonly reps?: number;
   readonly gmode?: GraphMode;
   readonly mode?: GraphMode;
@@ -45,7 +46,7 @@ export interface CugtestResult extends GraphTestResult {
 
 export type CugTestStatistic = (data: number[][], options: Record<string, unknown>) => unknown;
 
-export interface CugTestOptions extends RandomOptions {
+export interface CugTestOptions extends RandomOptions, CancellationOptions {
   readonly reps?: number;
   readonly mode?: GraphMode;
   readonly cmode?: "size" | "edges" | "dyad.census";
@@ -71,8 +72,11 @@ export function qaptest(data: GraphInput | readonly GraphInput[], statistic: Gra
 
   const testValue = evaluateStatistic(statistic(stack, statisticOptions), "qaptest");
   const distribution = Array.from({ length: reps }, (_unused, index) => {
+    checkAborted(options.signal);
     const permuted = rmperm(stack, rngOptionsForRep(options, index)) as number[][][];
-    return evaluateStatistic(statistic(permuted, statisticOptions), "qaptest");
+    const value = evaluateStatistic(statistic(permuted, statisticOptions), "qaptest");
+    options.onProgress?.(index + 1, reps);
+    return value;
   });
 
   return {
@@ -108,9 +112,12 @@ export function cugtest(data: GraphInput | readonly GraphInput[], statistic: Gra
   const distribution = Array.from({ length: reps }, (_unused, index) => {
     const rngOptions = rngOptionsForRep(options, index);
     const secondRngOptions = options.rng !== undefined ? { rng: options.rng } : options.seed !== undefined ? { seed: `${String(options.seed)}:cug:${index}:second` } : {};
+    checkAborted(options.signal);
     const draw1 = rgraph(graph1.length, cugDrawOptions(rngOptions, mode, diag, cmode, densities[0]!, graph1)) as number[][];
     const draw2 = rgraph(graph2.length, cugDrawOptions(secondRngOptions, mode, diag, cmode, densities[1]!, graph2)) as number[][];
-    return evaluateStatistic(statistic([draw1, draw2], statisticOptions), "cugtest");
+    const value = evaluateStatistic(statistic([draw1, draw2], statisticOptions), "cugtest");
+    options.onProgress?.(index + 1, reps);
+    return value;
   });
 
   return {
@@ -154,10 +161,13 @@ function cugTestSingle(data: GraphInput, statistic: CugTestStatistic, options: C
 
   const distribution = Array.from({ length: reps }, (_unused, index) => {
     const rngOptions = rngOptionsForRep(options, index);
+    checkAborted(options.signal);
     const draw = ignoreEval
       ? drawUnvaluedCugReplicate(observedGraph, mode, diag, cmode, rngOptions)
       : drawValuedCugReplicate(raw, mode, diag, cmode, resolveRandomSource(rngOptions), rngOptions);
-    return evaluateStatistic(statistic(draw, statisticOptions), "cugTest");
+    const value = evaluateStatistic(statistic(draw, statisticOptions), "cugTest");
+    options.onProgress?.(index + 1, reps);
+    return value;
   });
 
   return {
