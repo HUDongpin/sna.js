@@ -25,6 +25,13 @@ jobs:
         with:
           node-version: 24
       - run: npm --version
+      - name: OIDC diagnostics
+        run: |
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "OIDC token request URL is present (id-token permission granted)"
+          else
+            echo "OIDC token request URL MISSING - id-token permission not granted"
+          fi
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
