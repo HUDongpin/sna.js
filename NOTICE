@@ -1,7 +1,8 @@
-SNA.js project template
+SNA.js
 
-This repository is intended as a JavaScript/TypeScript port of the R package `sna` 2.8.
-The original reference source is included under `reference/r-sna-2.8/` for porting only.
+SNA.js is a JavaScript/TypeScript port of the R package `sna` version 2.8 and
+is therefore a derivative work of GPL-licensed code. The project is licensed
+GPL-2.0-or-later; see LICENSE.
 
 Original package metadata:
 - Package: sna
@@ -10,7 +11,16 @@ Original package metadata:
 - Author/Maintainer: Carter T. Butts
 - License: GPL (>= 2)
 - CRAN publication date in DESCRIPTION: 2024-09-08
+- Source: https://cran.r-project.org/package=sna
 
-Because the intended implementation is a port/derivative of GPL-licensed code, keep this
-project under a GPL-compatible license unless you obtain separate permission from the
-original copyright holder.
+Files under src/ that are translations of specific R or C routines carry a
+header comment naming the original file and routine (for example,
+"Ported from R sna 2.8: R/nli.R `degree` and src/nli.c `degree_R`").
+
+Parity fixtures under fixtures/r-sna-2.8/ are generated outputs produced by
+executing the original R package; the generator script records provenance
+(R version, sna version, seeds, timestamp) inside the fixture file.
+
+Anyone distributing this library (including bundling it into JavaScript
+served to web browsers) must comply with the GPL; see the License section of
+README.md for practical notes.
