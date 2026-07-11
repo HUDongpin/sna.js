@@ -1,7 +1,7 @@
 // Cancellation, progress, and resource-guard behavior (review F-012).
 import { describe, expect, it } from "vitest";
 
-import { betweenness, geodist, qaptest, setMaxGraphOrder, triadCensus } from "../../src/index";
+import { betweenness, geodist, makeDenseGraph, qaptest, setMaxGraphOrder, triadCensus } from "../../src/index";
 import { executeSnaTask } from "../../src/worker/index";
 
 const p4 = [
@@ -63,13 +63,16 @@ describe("progress callbacks", () => {
 
 describe("graph order guard", () => {
   it("rejects graphs above the configured maximum with an actionable error", () => {
+    expect(() => makeDenseGraph({ order: 100_000, edges: [[0, 1]] })).toThrow(/setMaxGraphOrder/);
     expect(() => geodist({ order: 100_000, edges: [[0, 1]] })).toThrow(/setMaxGraphOrder/);
   });
 
   it("can be raised deliberately", () => {
+    // Probe normalization only: the guard fires there, and a graph traversal
+    // at this order would be needlessly slow on CI runners.
     const previous = setMaxGraphOrder(6000);
     try {
-      expect(() => geodist({ order: 5500, edges: [[0, 1]] })).not.toThrow();
+      expect(() => makeDenseGraph({ order: 5500, edges: [[0, 1]] })).not.toThrow();
     } finally {
       setMaxGraphOrder(previous);
     }

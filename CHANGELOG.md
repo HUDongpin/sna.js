@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. This is a scientific
 library: **any change that alters numerical results is called out explicitly.**
 
+## 0.3.1 — 2026-07-11
+
+No code changes. The 0.3.0 release-gate test that raises the graph-order cap
+probed `geodist` at order 5500, which exceeded the test timeout on slower CI
+runners; it now probes graph normalization directly (where the guard fires).
+0.3.0 exists as a git tag only and was never published to npm.
+
 ## 0.3.0 — 2026-07-11
 
 No changes to numerical results.
