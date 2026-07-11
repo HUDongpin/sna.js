@@ -68,5 +68,15 @@ changes numerical results**, however slightly.
 
 1. Update `CHANGELOG.md`, bump `version` in `package.json` (semver).
 2. `npm run check:publish` on a clean checkout.
-3. Tag `vX.Y.Z`, push, and publish from CI (`npm publish --provenance`).
-   Never publish from a laptop; never hand-edit `dist/`.
+3. Tag `vX.Y.Z`, push, and dispatch the publish workflow against the tag:
+   `gh workflow run publish.yml --ref vX.Y.Z`. It re-runs the full gate and
+   publishes via npm trusted publishing (OIDC + provenance, no stored token).
+   Never hand-edit `dist/`.
+
+   *Status note:* the workflow is ready and the GitHub side verified (OIDC
+   token minted with the npm audience), but the registry's token exchange
+   currently returns 404 — the Trusted Publisher entry on npmjs.com for
+   `@peterhudongpin/sna.js` does not match `HUDongpin`/`sna.js`/`publish.yml`
+   yet. Until that is fixed, publish from a clean tag worktree:
+   `git worktree add /tmp/rel vX.Y.Z && cd /tmp/rel && npm ci && npm publish`
+   (requires the maintainer's npm 2FA).
