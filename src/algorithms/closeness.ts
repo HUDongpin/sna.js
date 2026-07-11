@@ -1,6 +1,8 @@
+// Ported from R sna 2.8: R/nli.R `closeness`.
 import { geodist } from "./geodist";
-import { denseGraphToMatrix, makeDenseGraph } from "../core/graph";
+import { makeDenseGraph } from "../core/graph";
 import type { GeodistResult, GraphInput, GraphOptions } from "../core/types";
+import { symmetrizeForUndirectedGeodesics } from "./pathCentrality";
 
 export type ClosenessMode = "directed" | "undirected" | "suminvdir" | "suminvundir" | "gil-schmidt";
 
@@ -21,14 +23,10 @@ export function closeness(input: GraphInput, options: ClosenessOptions = {}): nu
 
   if (options.tmaxdev) return theoreticalMaxDeviation(n, mode, graph.directed);
 
+  // R symmetrizes for these cmodes regardless of gmode (nli.R `closeness`).
   const useUndirectedGeodesics = mode === "undirected" || mode === "suminvundir";
-  const geodistInput = useUndirectedGeodesics ? denseGraphToMatrix(graph, true) : graph;
-  const geodistOptions =
-    useUndirectedGeodesics
-      ? { ...options, mode: "graph" as const, directed: false, countPaths: false as const, predecessors: false as const }
-      : options.mode
-        ? { ...options, mode: options.mode, directed: graph.directed, countPaths: false as const, predecessors: false as const }
-        : { ...options, directed: graph.directed, countPaths: false as const, predecessors: false as const };
+  const geodistInput = useUndirectedGeodesics ? symmetrizeForUndirectedGeodesics(graph) : graph;
+  const geodistOptions = { ...options, countPaths: false as const, predecessors: false as const };
   const distances = options.geodistPrecomp
     ? checkedPrecomputedDistances(options.geodistPrecomp, n)
     : geodist(geodistInput, geodistOptions).distances;

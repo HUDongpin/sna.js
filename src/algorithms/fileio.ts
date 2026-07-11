@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/fileio.R (`read.dot`, `read.nos`, `write.nos`, `write.dl`).
 import { createNumberMatrix } from "../core/matrix";
 import { isDenseGraph, isEdgeListInput } from "../core/graph";
 import type { GraphInput, MatrixCell, MatrixLike } from "../core/types";

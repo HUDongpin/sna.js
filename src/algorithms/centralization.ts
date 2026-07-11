@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/gli.R `centralization`.
 import type { GraphInput, GraphOptions } from "../core/types";
 import { betweenness } from "./betweenness";
 import { bonpow } from "./bonpow";

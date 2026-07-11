@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/gli.R (`dyad.census`, `grecip`, `mutuality`, `gtrans`, `connectedness`, `efficiency`, `hierarchy`, `lubness`).
 import { makeDenseGraph } from "../core/graph";
 import type { DenseGraph, GraphInput, GraphOptions } from "../core/types";
 

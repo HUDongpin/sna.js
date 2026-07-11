@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/connectivity.R (`cutpoints`, `bicomponent.dist`, `kcores`, `clique.census`, `kpath.census`, `kcycle.census`, `maxflow`, `simmelian`, `structure.statistics`).
 import { makeDenseGraph } from "../core/graph";
 import { createNumberMatrix } from "../core/matrix";
 import type { DenseGraph, EdgeListInput, GeodistResult, GraphInput, GraphMode, GraphOptions } from "../core/types";

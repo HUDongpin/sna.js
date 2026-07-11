@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/nli.R `infocent`.
 import { denseGraphToMatrix, makeDenseGraph } from "../core/graph";
 import { invertMatrix } from "../core/linearAlgebra";
 import { createNumberMatrix } from "../core/matrix";

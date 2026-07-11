@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: Edmonds-Karp support routine for the R/nli.R `flowbet` and R/connectivity.R `maxflow` ports.
 import { createNumberMatrix } from "../core/matrix";
 import type { DenseGraph } from "../core/types";
 

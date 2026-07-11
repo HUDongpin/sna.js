@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/nli.R `prestige`.
 import { evcent } from "./evcent";
 import { geodist } from "./geodist";
 import { reachability } from "./connectivity";

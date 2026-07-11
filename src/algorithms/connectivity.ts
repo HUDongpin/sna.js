@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/connectivity.R (`component.dist`, `reachability`, `neighborhood`, `component.largest`).
 import { makeDenseGraph } from "../core/graph";
 import { createNumberMatrix } from "../core/matrix";
 import type { DenseGraph, EdgeListInput, GeodistResult, GraphInput, GraphOptions } from "../core/types";

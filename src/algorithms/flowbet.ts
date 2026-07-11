@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/nli.R `flowbet`.
 import { makeDenseGraph } from "../core/graph";
 import { createNumberMatrix } from "../core/matrix";
 import type { GraphInput, GraphOptions } from "../core/types";

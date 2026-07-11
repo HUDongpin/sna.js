@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/randomgraph.R (`rgraph`, `rgnm`, `rguman`, `rgws`, `rgbn`, `rgnmix`, `rewire.ws`, `rewire.ud`).
 import { isDenseGraph, isEdgeListInput } from "../core/graph";
 import { createNumberMatrix } from "../core/matrix";
 import type { GraphInput, GraphMode, MatrixLike } from "../core/types";

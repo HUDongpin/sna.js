@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/nli.R `loadcent`.
 import { makeDenseGraph } from "../core/graph";
 import type { GeodistResult, GraphInput, GraphOptions } from "../core/types";
 import { pathCentralityScores } from "./pathCentrality";

@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R print/summary/plot S3 methods across the sna package, returned as data instead of drawn.
 import type { GraphTestResult, CugtestResult, CugTestResult } from "../algorithms/graphTests";
 import { createNumberMatrix } from "../core/matrix";
 import { jacobiEigenSymmetric } from "../core/linearAlgebra";

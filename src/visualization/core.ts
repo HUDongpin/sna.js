@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/visualization.R (`gplot`, `plot.sociomatrix`, gplot.layout.*).
 import { createNumberMatrix } from "../core/matrix";
 import { resolveRandomSource, type RandomOptions, type RandomSource } from "../core/random";
 import type { GraphInput, GraphMode } from "../core/types";
@@ -1066,5 +1067,5 @@ function fmt(value: number): string {
 }
 
 function escapeXml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }

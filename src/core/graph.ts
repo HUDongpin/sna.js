@@ -36,7 +36,9 @@ export function makeDenseGraph(input: GraphInput, options: GraphOptions = {}): D
   const directed = resolveDirected(options, isEdgeListInput(input) ? input : undefined);
   const loops = options.diag ?? false;
   const threshold = options.threshold ?? 0;
-  const symmetrize = options.symmetrize ?? "weak";
+  // Matrix data is used as given even when mode is "graph", matching R sna:
+  // R never symmetrizes silently. Pass `symmetrize` explicitly to opt in.
+  const symmetrize = options.symmetrize ?? false;
 
   if (isEdgeListInput(input)) {
     return denseFromEdgeList(input, { directed, loops, threshold, indexBase: options.indexBase ?? input.indexBase ?? 0 });

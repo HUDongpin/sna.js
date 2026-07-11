@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/gtest.R (`qaptest`, `cugtest`, `cug.test`).
 import { isDenseGraph, isEdgeListInput } from "../core/graph";
 import type { GraphInput, GraphMode } from "../core/types";
 import { resolveRandomSource, shuffleInPlace, type RandomOptions, type RandomSource } from "../core/random";

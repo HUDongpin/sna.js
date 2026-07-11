@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/roles.R (`sedist`, `redist`, `equiv.clust`, `blockmodel`, `blockmodel.expand`).
 import { isDenseGraph, isEdgeListInput } from "../core/graph";
 import { createNumberMatrix } from "../core/matrix";
 import type { GraphInput, GraphMode } from "../core/types";

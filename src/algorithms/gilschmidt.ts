@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/nli.R `gilschmidt`.
 import { makeDenseGraph } from "../core/graph";
 import type { GraphInput, GraphOptions } from "../core/types";
 import { geodist } from "./geodist";

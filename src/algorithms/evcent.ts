@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/nli.R `evcent` and src/nli.c `evcent_R`.
 import { makeDenseGraph } from "../core/graph";
 import { jacobiEigenSymmetric, solveLinearSystem } from "../core/linearAlgebra";
 import { createNumberMatrix } from "../core/matrix";
@@ -24,14 +25,24 @@ export function evcent(input: GraphInput, options: EvcentOptions = {}): number |
 
   if (n === 0) return [];
 
-  const values = options.useEigen ? denseEigenMethod(graph, options) : powerMethod(graph, options);
+  let values: number[];
+  if (options.useEigen) {
+    values = denseEigenMethod(graph, options);
+  } else {
+    // The power method oscillates when the two largest eigenvalues tie in
+    // magnitude (e.g. bipartite structures); R's evcent returns the stale
+    // iterate with a warning. Fall back to the dense eigen solver instead of
+    // silently returning a non-converged vector.
+    const power = powerMethod(graph, options);
+    values = power.converged ? power.values : denseEigenMethod(graph, options);
+  }
   const rescaled = options.rescale ? rescale(values) : values;
   return selectNodes(rescaled, options.nodes);
 }
 
 type DenseGraphLike = ReturnType<typeof makeDenseGraph>;
 
-function powerMethod(graph: DenseGraphLike, options: EvcentOptions): number[] {
+function powerMethod(graph: DenseGraphLike, options: EvcentOptions): { values: number[]; converged: boolean } {
   const n = graph.order;
   const ignoreEval = options.ignoreEval ?? false;
   const tol = options.tol ?? 1e-10;
@@ -55,7 +66,7 @@ function powerMethod(graph: DenseGraphLike, options: EvcentOptions): number[] {
     let norm = 0;
     for (const value of next) norm += value * value;
     norm = Math.sqrt(norm);
-    if (norm === 0) return Array.from({ length: n }, () => Number.NaN);
+    if (norm === 0) return { values: Array.from({ length: n }, () => Number.NaN), converged: true };
 
     diff = 0;
     for (let vertex = 0; vertex < n; vertex += 1) {
@@ -65,11 +76,7 @@ function powerMethod(graph: DenseGraphLike, options: EvcentOptions): number[] {
     }
   }
 
-  if (iteration === maxiter && Math.sqrt(diff) > tol) {
-    console.warn("Maximum iterations exceeded in evcent without convergence. Increase maxiter or use a more robust eigen solver.");
-  }
-
-  return values;
+  return { values, converged: Math.sqrt(diff) <= tol };
 }
 
 function denseEigenMethod(graph: DenseGraphLike, options: EvcentOptions): number[] {

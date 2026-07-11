@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/connectivity.R `components`.
 import { hasTie, makeDenseGraph } from "../core/graph";
 import type { ComponentResult, GraphInput, GraphOptions } from "../core/types";
 

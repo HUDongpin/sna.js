@@ -1,5 +1,7 @@
-import { denseGraphToMatrix, makeDenseGraph } from "../core/graph";
+// Ported from R sna 2.8: R/nli.R `graphcent`.
+import { makeDenseGraph } from "../core/graph";
 import type { DenseGraph, GeodistResult, GraphInput, GraphOptions } from "../core/types";
+import { symmetrizeForUndirectedGeodesics } from "./pathCentrality";
 
 export type GraphCentralityMode = "directed" | "undirected";
 
@@ -25,7 +27,7 @@ export function graphcent(input: GraphInput, options: GraphCentralityOptions = {
 
   if (options.tmaxdev) return mode === "undirected" ? (n - 1) / 2 : (n - 1) * (1 - 1 / n);
 
-  const graph = mode === "undirected" && baseGraph.directed ? makeDenseGraph(denseGraphToMatrix(baseGraph, true), { ...options, mode: "graph", directed: false }) : baseGraph;
+  const graph = mode === "undirected" ? symmetrizeForUndirectedGeodesics(baseGraph) : baseGraph;
   const distances = options.geodistPrecomp ? checkedPrecomputedDistances(options.geodistPrecomp, graph.order) : allPairsDistances(graph, options.ignoreEval ?? true);
   let values = distances.map((row) => {
     const eccentricity = row.reduce((maximum, distance) => Math.max(maximum, distance), 0);

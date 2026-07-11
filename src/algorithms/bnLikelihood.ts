@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/models.R `bn` likelihood helpers (bn.nlpl.*, bn.nltl).
 /*
  * Browser-safe port of the Skvoretz triadic biased-net likelihood table
  * from R sna 2.8 src/likelihood.c:bn_lpt.

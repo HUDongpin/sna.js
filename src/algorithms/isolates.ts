@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/connectivity.R (`isolates`, `is.isolate`).
 import { makeDenseGraph } from "../core/graph";
 import type { DenseGraph, GraphInput, GraphOptions } from "../core/types";
 

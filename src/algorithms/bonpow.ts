@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/nli.R `bonpow`.
 import { makeDenseGraph } from "../core/graph";
 import { solveLinearSystem } from "../core/linearAlgebra";
 import { createNumberMatrix } from "../core/matrix";

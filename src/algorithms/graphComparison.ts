@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/gmultiv.R (`centralgraph`, `gcor`, `gcov`, `gscor`, `gscov`, `hdist`, `sdmat`, `structdist`, `gclust.*`).
 import { isDenseGraph, isEdgeListInput } from "../core/graph";
 import { createNumberMatrix } from "../core/matrix";
 import type { GraphInput, GraphMode } from "../core/types";

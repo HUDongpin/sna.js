@@ -1,3 +1,4 @@
+// R-name compatibility table for the exported API.
 import { betweenness } from "../algorithms/betweenness";
 import { bonpow } from "../algorithms/bonpow";
 import { centralization } from "../algorithms/centralization";

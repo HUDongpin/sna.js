@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/dataprep.R (as.edgelist.sna, as.sociomatrix.sna, symmetrize, gvectorize, event2dichot, interval.graph, make.stochastic and related helpers).
 import { isDenseGraph, isEdgeListInput } from "../core/graph";
 import { createNumberMatrix } from "../core/matrix";
 import { randomInt, resolveRandomSource, type RandomOptions, type RandomSource } from "../core/random";

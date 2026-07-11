@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/gli.R (`triad.census`, `triad.classify`) and src/triads.c.
 import { makeDenseGraph } from "../core/graph";
 import type { DenseGraph, GraphInput, GraphOptions } from "../core/types";
 

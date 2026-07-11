@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: src/nli.c shortest-path accumulation modes shared by `betweenness_R`, `stresscent_R`, and `loadcent_R`.
 import { denseGraphToMatrix, makeDenseGraph } from "../core/graph";
 import type { DenseGraph, GeodistResult, GraphInput, GraphOptions } from "../core/types";
 
@@ -26,7 +27,7 @@ export interface PathCentralityComputeOptions extends PathCentralityOptions {
   readonly weightedErrorLabel?: string;
 }
 
-interface SourcePaths {
+export interface SourcePaths {
   readonly distances: number[];
   readonly sigma: number[];
   readonly predecessors: number[][];
@@ -34,7 +35,7 @@ interface SourcePaths {
   readonly reachableCount: number;
 }
 
-interface AdjacentEdge {
+export interface AdjacentEdge {
   readonly target: number;
   readonly weight: number;
 }
@@ -43,10 +44,8 @@ const EPSILON = 1e-12;
 
 export function pathCentralityScores(input: GraphInput, options: PathCentralityComputeOptions): number[] {
   const baseGraph = makeDenseGraph(input, options);
-  let graph =
-    options.undirectedGeodesics && baseGraph.directed
-      ? makeDenseGraph(denseGraphToMatrix(baseGraph, true), { ...options, mode: "graph", directed: false })
-      : baseGraph;
+  // R symmetrizes for undirected cmodes regardless of gmode (nli.R).
+  let graph = options.undirectedGeodesics ? symmetrizeForUndirectedGeodesics(baseGraph) : baseGraph;
   if (options.transposeDirected && graph.directed) graph = transposeDenseGraph(graph);
 
   const adjacency = buildAdjacencyLists(graph, options.ignoreEval ?? true, options.weightedErrorLabel ?? "path centrality");
@@ -75,7 +74,45 @@ export function selectNodes(values: readonly number[], nodes: readonly number[] 
   });
 }
 
-function buildAdjacencyLists(graph: DenseGraph, ignoreEval: boolean, label: string): AdjacentEdge[][] {
+/**
+ * Undirected view of a directed graph for geodesic purposes, mirroring the
+ * `symmetrize(..., rule="weak", return.as.edgelist=TRUE)` step in R's
+ * closeness/betweenness `cmode="undirected"`: R keeps the first edge of each
+ * dyad in column-major order, so an existing lower-triangle value wins over
+ * the upper-triangle one.
+ */
+export function symmetrizeForUndirectedGeodesics(graph: DenseGraph): DenseGraph {
+  const n = graph.order;
+  const weights = new Float64Array(n * n);
+  const adjacency = new Uint8Array(n * n);
+  let missing: Uint8Array | undefined;
+
+  const copyCell = (from: number, to: number): void => {
+    weights[to] = graph.weights[from]!;
+    adjacency[to] = graph.adjacency[from]!;
+    if (graph.missing?.[from]) {
+      missing ??= new Uint8Array(n * n);
+      missing[to] = 1;
+    }
+  };
+
+  for (let i = 0; i < n; i += 1) {
+    if (graph.loops) copyCell(i * n + i, i * n + i);
+    for (let j = i + 1; j < n; j += 1) {
+      const upper = i * n + j;
+      const lower = j * n + i;
+      const source = graph.adjacency[lower] || graph.missing?.[lower] ? lower : upper;
+      copyCell(source, upper);
+      copyCell(source, lower);
+    }
+  }
+
+  return missing
+    ? { kind: "dense", order: n, directed: false, loops: graph.loops, weights, adjacency, missing }
+    : { kind: "dense", order: n, directed: false, loops: graph.loops, weights, adjacency };
+}
+
+export function buildAdjacencyLists(graph: DenseGraph, ignoreEval: boolean, label: string): AdjacentEdge[][] {
   const out: AdjacentEdge[][] = Array.from({ length: graph.order }, () => []);
 
   for (let tail = 0; tail < graph.order; tail += 1) {
@@ -91,7 +128,7 @@ function buildAdjacencyLists(graph: DenseGraph, ignoreEval: boolean, label: stri
   return out;
 }
 
-function singleSourcePaths(n: number, adjacency: readonly AdjacentEdge[][], source: number, ignoreEval: boolean): SourcePaths {
+export function singleSourcePaths(n: number, adjacency: readonly AdjacentEdge[][], source: number, ignoreEval: boolean): SourcePaths {
   return ignoreEval ? unweightedSingleSourcePaths(n, adjacency, source) : weightedSingleSourcePaths(n, adjacency, source);
 }
 

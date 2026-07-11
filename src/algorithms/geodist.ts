@@ -1,6 +1,8 @@
+// Ported from R sna 2.8: R/connectivity.R `geodist` (geodist_R / geodist_val_R).
 import { makeDenseGraph } from "../core/graph";
 import { createNumberMatrix } from "../core/matrix";
 import type { GeodistResult, GraphInput, GraphOptions } from "../core/types";
+import { buildAdjacencyLists, singleSourcePaths } from "./pathCentrality";
 
 export interface GeodistOptions extends GraphOptions {
   readonly infReplace?: number;
@@ -11,36 +13,21 @@ export interface GeodistOptions extends GraphOptions {
 export function geodist(input: GraphInput, options: GeodistOptions = {}): GeodistResult {
   const graph = makeDenseGraph(input, options);
   const n = graph.order;
+  // R's geodist defaults to ignore.eval=TRUE (unweighted BFS); with
+  // ignore.eval=FALSE it runs a Dijkstra-style search (geodist_val_R) and
+  // rejects negative edge values.
+  const ignoreEval = options.ignoreEval ?? true;
+  const adjacency = buildAdjacencyLists(graph, ignoreEval, "geodist");
+
   const distances = createNumberMatrix(n, n, Number.POSITIVE_INFINITY);
   const counts = createNumberMatrix(n, n, 0);
-  const predecessorData = options.predecessors ? Array.from({ length: n }, () => Array.from({ length: n }, () => [] as number[])) : undefined;
-  const adjacency = buildAdjacencyLists(graph.adjacency, n);
+  const predecessorData = options.predecessors ? Array.from({ length: n }, () => [] as number[][]) : undefined;
 
   for (let source = 0; source < n; source += 1) {
-    const dist = distances[source]!;
-    const count = counts[source]!;
-    const queue = new Int32Array(n);
-    let head = 0;
-    let tail = 0;
-
-    dist[source] = 0;
-    count[source] = 1;
-    queue[tail++] = source;
-
-    while (head < tail) {
-      const vertex = queue[head++]!;
-      const nextDistance = (dist[vertex] ?? 0) + 1;
-      for (const next of adjacency[vertex]!) {
-        if (dist[next] === Number.POSITIVE_INFINITY) {
-          dist[next] = nextDistance;
-          queue[tail++] = next;
-        }
-        if (dist[next] === nextDistance) {
-          count[next] = (count[next] ?? 0) + (count[vertex] ?? 0);
-          if (predecessorData) predecessorData[source]![next]!.push(vertex);
-        }
-      }
-    }
+    const paths = singleSourcePaths(n, adjacency, source, ignoreEval);
+    distances[source] = paths.distances;
+    counts[source] = paths.sigma;
+    if (predecessorData) predecessorData[source] = paths.predecessors;
   }
 
   if (typeof options.infReplace === "number") {
@@ -52,14 +39,4 @@ export function geodist(input: GraphInput, options: GeodistOptions = {}): Geodis
   }
 
   return predecessorData ? { distances, counts, predecessors: predecessorData } : { distances, counts };
-}
-
-function buildAdjacencyLists(adjacency: Uint8Array, n: number): number[][] {
-  const out: number[][] = Array.from({ length: n }, () => []);
-  for (let i = 0; i < n; i += 1) {
-    for (let j = 0; j < n; j += 1) {
-      if (adjacency[i * n + j]) out[i]!.push(j);
-    }
-  }
-  return out;
 }

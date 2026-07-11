@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/sna-operators.R and R/gli.R (`gapply`, `gliop`, log-space helpers).
 import { createNumberMatrix } from "../core/matrix";
 import { isDenseGraph, isEdgeListInput } from "../core/graph";
 import type { GraphInput, GraphMode } from "../core/types";

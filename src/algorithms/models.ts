@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/models.R (`netlm`, `netlogit`, `lnam`, `bbnam*`, `bn`, `pstar`, `brokerage`, `consensus`, `nacf`, `netcancor`, `npostpred`, `eval.edgeperturbation`).
 import { createNumberMatrix } from "../core/matrix";
 import type { GraphInput, GraphMode } from "../core/types";
 import { assertProbability, resolveRandomSource, type RandomOptions, type RandomSource } from "../core/random";

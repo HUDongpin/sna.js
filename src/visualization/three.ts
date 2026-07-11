@@ -1,3 +1,4 @@
+// Ported from R sna 2.8: R/visualization.R (`gplot3d`, gplot3d.layout.*).
 import * as THREE from "three";
 
 import { asEdgelistSna, type SnaEdgeList } from "../algorithms/dataprep";
