@@ -17,7 +17,7 @@ import {
   mutuality,
   nties,
   reachability,
-} from "../dist/browser.js";
+} from "../dist/index.js";
 
 export const exampleGraph = [
   [0, 1, 0, 0],
