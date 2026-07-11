@@ -25,6 +25,8 @@ export { closeness } from "./algorithms/closeness";
 export type { ClosenessMode, ClosenessOptions } from "./algorithms/closeness";
 export { components, isConnected } from "./algorithms/components";
 export type { ComponentsOptions } from "./algorithms/components";
+export { labelPropagation } from "./algorithms/community";
+export type { CommunityResult, LabelPropagationOptions } from "./algorithms/community";
 export { componentDist, componentLargest, componentSizeByVertex, neighborhood, reachability } from "./algorithms/connectivity";
 export type {
   ComponentDistOptions,
@@ -88,7 +90,7 @@ export type { EvcentOptions } from "./algorithms/evcent";
 export { flowbet } from "./algorithms/flowbet";
 export type { FlowBetweennessMode, FlowBetweennessOptions } from "./algorithms/flowbet";
 export { gden, nties } from "./algorithms/density";
-export { geodist } from "./algorithms/geodist";
+export { averagePathLength, geodist } from "./algorithms/geodist";
 export type { GeodistOptions } from "./algorithms/geodist";
 export { readDot, readNos, writeDl, writeNos } from "./algorithms/fileio";
 export type { ReadDotOptions, ReadDotResult, ReadNosOptions, WriteDlOptions, WriteNosOptions } from "./algorithms/fileio";

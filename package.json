@@ -1,6 +1,6 @@
 {
   "name": "@peterhudongpin/sna.js",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "A browser-compatible TypeScript/JavaScript port of the R sna social network analysis package.",
   "type": "module",
   "sideEffects": false,

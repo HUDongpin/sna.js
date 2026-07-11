@@ -142,6 +142,20 @@ Deliberate, documented differences — everything else is a bug, and the parity 
 
 For reproducible research runs, always pass `{ seed: … }` to stochastic functions.
 
+## Extensions beyond R sna
+
+Two functions have no R `sna` 2.8 counterpart. They exist because downstream
+consumers (e.g. [SENA](https://www.sena.hk)) need igraph-comparable summary
+metrics from the same graph normalization as the rest of this package; they
+were ported unchanged from the sna.js 0.0.x template those consumers
+previously vendored, and are gated by unit tests instead of the R parity
+suite:
+
+| Function | Behavior |
+|---|---|
+| `averagePathLength(input, options)` | Mean geodesic distance over ordered vertex pairs `i !== j` with a finite positive distance (via `geodist`); unreachable pairs are excluded unless `infReplace` maps them to a finite value; 0 when no finite pair exists. Comparable to igraph `average.path.length`. |
+| `labelPropagation(input, options)` | Deterministic weighted label propagation returning `{ method, labels, sizes, count }`: index-order sweeps, greatest symmetrized tie weight wins, exact ties break toward the smaller label. Edge values weight the propagation by default (`ignoreEval: true` for binary); `maxIterations` defaults to 50. |
+
 ## Porting notes
 
 <details>

@@ -3,6 +3,29 @@
 All notable changes to this project are documented here. This is a scientific
 library: **any change that alters numerical results is called out explicitly.**
 
+## 0.4.0 — 2026-07-12
+
+No changes to existing numerical results.
+
+### Added
+
+Two documented extensions beyond R sna 2.8, ported unchanged from the
+sna.js 0.0.x template that SENA previously vendored (so downstream numbers
+are preserved); see the README "Extensions beyond R sna" section:
+
+- **`averagePathLength(input, options)`**: mean geodesic distance over
+  ordered vertex pairs `i !== j` with a finite positive distance, via
+  `geodist`. Unreachable pairs are excluded (unless `infReplace` maps them
+  to a finite value); returns 0 when no finite pair exists. Comparable to
+  igraph `average.path.length`.
+- **`labelPropagation(input, options)`**: deterministic weighted
+  label-propagation community detection returning
+  `{ method, labels, sizes, count }`. Vertices are swept in index order,
+  adopting the label with the greatest symmetrized tie weight; exact ties
+  break toward the smaller label, so results are reproducible. Edge values
+  weight the propagation by default; `ignoreEval: true` propagates over
+  binary ties. `maxIterations` defaults to 50.
+
 ## 0.3.1 — 2026-07-11
 
 No code changes. The 0.3.0 release-gate test that raises the graph-order cap

@@ -43,3 +43,31 @@ export function geodist(input: GraphInput, options: GeodistOptions = {}): Geodis
 
   return predecessorData ? { distances, counts, predecessors: predecessorData } : { distances, counts };
 }
+
+/**
+ * Extension beyond R sna 2.8 (see README "Extensions beyond R sna"): the mean
+ * geodesic distance over ordered vertex pairs `i !== j` with a finite,
+ * positive distance, computed from `geodist`. Unreachable pairs are excluded
+ * from both the numerator and the denominator (unless `infReplace` maps them
+ * to a finite value first), and 0 is returned when no such pair exists.
+ * Comparable to igraph `average.path.length` / `mean_distance` on the same
+ * graph. Ported unchanged from the sna.js 0.0.x template so downstream
+ * numerical results are preserved.
+ */
+export function averagePathLength(input: GraphInput, options: GeodistOptions = {}): number {
+  const distances = geodist(input, options).distances;
+  let totalDistance = 0;
+  let pathCount = 0;
+
+  for (let rowIndex = 0; rowIndex < distances.length; rowIndex += 1) {
+    const row = distances[rowIndex]!;
+    for (let columnIndex = 0; columnIndex < row.length; columnIndex += 1) {
+      const distance = row[columnIndex] ?? Number.POSITIVE_INFINITY;
+      if (columnIndex === rowIndex || !Number.isFinite(distance) || distance <= 0) continue;
+      totalDistance += distance;
+      pathCount += 1;
+    }
+  }
+
+  return pathCount > 0 ? totalDistance / pathCount : 0;
+}
