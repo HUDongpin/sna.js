@@ -3,3 +3,7 @@ dist/
 coverage/
 *.tgz
 .DS_Store
+.venv-oracles/
+.venv-validation/
+validation/
+01_Programming_Resilience_811.xlsx

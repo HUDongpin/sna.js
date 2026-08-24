@@ -1,0 +1,7 @@
+# Oracle-generation dependencies only. They are not runtime dependencies of
+# @peterhudongpin/sna.js. Use Python 3.13 for byte-stable regeneration.
+igraph==1.0.0
+networkx==3.6.1
+numpy==2.5.2
+scipy==1.18.1
+texttable==1.7.0

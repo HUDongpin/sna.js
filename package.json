@@ -1,9 +1,12 @@
 {
   "name": "@peterhudongpin/sna.js",
-  "version": "0.4.0",
-  "description": "A browser-compatible TypeScript/JavaScript port of the R sna social network analysis package.",
+  "version": "0.5.0",
+  "description": "A browser- and Node-compatible TypeScript social network analysis toolkit with R sna parity and modern sparse graph algorithms.",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/worker/index.js",
+    "./dist/worker/index.cjs"
+  ],
   "license": "GPL-2.0-or-later",
   "author": "Dongpin Hu <hudongpin123@gmail.com>",
   "repository": {
@@ -54,31 +57,80 @@
       "types": "./dist/visualization/three.d.ts",
       "import": "./dist/visualization/three.js",
       "require": "./dist/visualization/three.cjs"
+    },
+    "./graph": {
+      "types": "./dist/graph/index.d.ts",
+      "import": "./dist/graph/index.js",
+      "require": "./dist/graph/index.cjs"
+    },
+    "./centrality": {
+      "types": "./dist/centrality/index.d.ts",
+      "import": "./dist/centrality/index.js",
+      "require": "./dist/centrality/index.cjs"
+    },
+    "./statistics": {
+      "types": "./dist/statistics/index.d.ts",
+      "import": "./dist/statistics/index.js",
+      "require": "./dist/statistics/index.cjs"
+    },
+    "./community": {
+      "types": "./dist/community/index.d.ts",
+      "import": "./dist/community/index.js",
+      "require": "./dist/community/index.cjs"
+    },
+    "./prediction": {
+      "types": "./dist/prediction/index.d.ts",
+      "import": "./dist/prediction/index.js",
+      "require": "./dist/prediction/index.cjs"
+    },
+    "./modern": {
+      "types": "./dist/modern/index.d.ts",
+      "import": "./dist/modern/index.js",
+      "require": "./dist/modern/index.cjs"
     }
   },
   "files": [
     "dist",
     "!dist/**/*.map",
+    "src",
+    "scripts",
+    "docs",
     "examples",
+    "tsconfig.json",
+    "tsup.config.ts",
     "README.md",
+    "ROADMAP.md",
     "LICENSE",
     "NOTICE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "CONTRIBUTING.md"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node scripts/write-compat-entry.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:modern": "vitest run tests/modern",
+    "test:browser": "node scripts/browser-smoke.mjs",
+    "benchmark:modern": "npm run build && node scripts/benchmark-modern.mjs",
+    "benchmark:modern:quick": "npm run build && node scripts/benchmark-modern.mjs --quick",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
+    "coverage:modern": "vitest run tests/modern --coverage --config vitest.modern.config.ts",
     "r:parity": "Rscript scripts/generate-r-snapshots.R",
     "example:node": "npm run build && node examples/node.mjs",
+    "example:resilience": "npm run build && node examples/programming-resilience.mjs",
+    "generate:sample": "node scripts/generate-programming-resilience-synthetic.mjs",
+    "check:sample": "node scripts/generate-programming-resilience-synthetic.mjs --check",
+    "validate:sample": "npm run build && node scripts/run-programming-resilience-validation.mjs",
+    "validate:sample:browser": "npm run build && node scripts/browser-programming-resilience-validation.mjs",
+    "check:parity-metadata": "node scripts/check-parity-metadata.mjs",
     "smoke:examples": "node scripts/smoke-examples.mjs",
+    "smoke:package": "node scripts/smoke-packed-package.mjs",
     "size:check": "node scripts/check-size.mjs",
-    "check:publish": "npm test && npm run typecheck && npm run build && npm run smoke:examples && npm run size:check && npm pack --dry-run",
+    "check:publish": "npm run check:parity-metadata && npm run check:sample && npm test && npm run coverage:modern && npm run typecheck && npm run build && node scripts/benchmark-modern.mjs && npm run example:resilience && npm run test:browser && npm run smoke:examples && npm run smoke:package && npm run size:check && npm pack --dry-run",
     "prepublishOnly": "npm test && npm run typecheck && npm run build"
   },
   "keywords": [
@@ -94,22 +146,34 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/three": "^0.184.1",
-    "@vitest/coverage-v8": "^3.2.7",
+    "@vitest/coverage-v8": "^4.1.11",
+    "esbuild": "^0.28.1",
+    "playwright": "^1.62.1",
+    "sigstore": "^4.1.1",
     "three": "^0.184.0",
-    "tsup": "^8.3.5",
-    "typescript": "^5.7.2",
-    "vitest": "^3.2.7"
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
   },
   "peerDependencies": {
+    "@types/three": "^0.184.1",
     "three": "^0.184.0"
   },
   "peerDependenciesMeta": {
+    "@types/three": {
+      "optional": true
+    },
     "three": {
       "optional": true
     }
   },
   "overrides": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "postcss": "^8.5.26",
+    "nanoid": "^6.0.1",
+    "brace-expansion": "^5.0.9",
+    "minimatch": "^10.2.6",
+    "fsevents": "2.3.2"
   },
   "publishConfig": {
     "access": "public"

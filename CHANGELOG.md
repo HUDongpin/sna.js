@@ -3,6 +3,62 @@
 All notable changes to this project are documented here. This is a scientific
 library: **any change that alters numerical results is called out explicitly.**
 
+## 0.5.0 — 2026-08-24
+
+No changes to existing root-entry numerical results or zero-based indexing.
+
+### Added
+
+- Separate `graph`, `centrality`, `statistics`, `community`, `prediction`, and
+  aggregate `modern` subpaths. None is re-exported from the compatibility root.
+- A validated property-graph boundary with stable string/number node IDs,
+  JSON-safe attributes, explicit duplicate-edge resolution, logical edge
+  arrays, and `O(n + m)` CSR/CSC storage.
+- PageRank with personalization/dangling vectors, HITS, and harmonic
+  centrality, including explicit strength semantics, convergence errors,
+  optional partial iterates, progress, and cancellation.
+- Triangles, binary/weighted/directed clustering, degree and attribute
+  assortativity/mixing matrices, and Burt constraint/effective size.
+- Common-neighbor, Jaccard, Adamic-Adar, resource-allocation, and preferential-
+  attachment prediction for required undirected candidate pairs.
+- Partition validation, modularity/quality, greedy modularity, seeded
+  multi-level Louvain, connectivity-preserving restricted Leiden, seeded
+  two-level map-equation Infomap with real trials, bounded Girvan–Newman,
+  modern label propagation, and overlapping k-clique percolation.
+- A typed `SnaTaskMap` for modern Web Worker calls while retaining the old
+  generic Worker overload and three runtime exports.
+- A deterministic 240-row synthetic programming-resilience CSV, its generator,
+  a Node analysis example, JSON/SVG outputs, and a separate local-only workbook
+  validation pipeline that refuses to write participant data into the repo.
+- Modern oracle/invariant fixtures, strict modern coverage gates, real Chromium
+  ESM + Worker testing, clean packed ESM/CJS/TypeScript consumers, and per-entry
+  API-surface and gzip budgets.
+
+### Changed
+
+- Corrected README parity metadata to the executable baseline: 17 graphs,
+  211 cases, and 35 function families. CI now derives and checks the marker.
+- Published sources are included with the exact tag for GPL/source
+  transparency; the unpacked package budget is now 4 MiB.
+- The release workflow is tag-only, validates tag/version/checkout SHA
+  identity, runs the complete `check:publish` gate, and publishes through npm
+  trusted publishing with provenance before registry/install/CDN verification
+  and GitHub Release creation.
+- Updated Vitest and development tooling; `npm audit` reports zero known
+  vulnerabilities in the locked dependency tree at release preparation time.
+
+### Scientific boundaries
+
+- `leiden()` reports `leiden-restricted`: it includes local moving, constrained
+  refinement, aggregation, and connected output communities, but does not
+  claim the reference algorithm's complete gamma-density/subset-optimality
+  guarantee.
+- `infomap()` reports `infomap-two-level-greedy`: it optimizes the two-level map
+  equation with seeded trials, not hierarchical or multilayer Infomap.
+- Randomized community membership is validated for legality, deterministic
+  seed reproduction, and independently recomputed quality; label equality
+  with another package is not claimed.
+
 ## 0.4.0 — 2026-07-12
 
 No changes to existing numerical results.

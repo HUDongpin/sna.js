@@ -32,6 +32,26 @@ import { stresscent } from "../algorithms/stresscent";
 import { cliqueCensus, kcores, kcycleCensus, kpathCensus, maxflow } from "../algorithms/structural";
 import { triadCensus } from "../algorithms/triads";
 import { gcor, gscor, hdist } from "../algorithms/graphComparison";
+import { pageRank, hits, type HitsOptions, type PageRankOptions } from "../centrality/index";
+import {
+  girvanNewman,
+  infomap,
+  leiden,
+  louvain,
+  type GirvanNewmanOptions,
+  type InfomapOptions,
+  type LeidenOptions,
+  type LouvainOptions,
+} from "../community/index";
+import type { HitsResult, ModernGraphInput, NodeScoreResult, PairScoreResult, PartitionResult } from "../modern/types";
+import {
+  adamicAdar,
+  commonNeighbors,
+  jaccardCoefficient,
+  preferentialAttachment,
+  resourceAllocation,
+  type PredictionPair,
+} from "../prediction/index";
 
 /** Graph statistics accepted by name for `qaptest` (stack, {g1, g2}). */
 const QAP_STATISTICS: Record<string, GraphTestStatistic> = {
@@ -50,6 +70,63 @@ const CUG_STATISTICS: Record<string, CugTestStatistic> = {
 };
 
 type TaskRunner = (payload: Record<string, unknown>, options: Record<string, unknown>) => unknown;
+
+/** Options that can cross a structured-clone boundary without callbacks. */
+type WorkerOptions<T> = Omit<T, keyof CancellationOptions | "rng">;
+
+export type LinkPredictionMethod =
+  | "commonNeighbors"
+  | "jaccardCoefficient"
+  | "adamicAdar"
+  | "resourceAllocation"
+  | "preferentialAttachment";
+
+/**
+ * Typed modern Worker protocol. Legacy task names remain accepted by the
+ * compatibility overload, while these entries infer payload, options, and
+ * result types end to end.
+ */
+export interface SnaTaskMap {
+  readonly pageRank: {
+    readonly payload: { readonly input: ModernGraphInput };
+    readonly options: WorkerOptions<PageRankOptions>;
+    readonly result: NodeScoreResult;
+  };
+  readonly hits: {
+    readonly payload: { readonly input: ModernGraphInput };
+    readonly options: WorkerOptions<HitsOptions>;
+    readonly result: HitsResult;
+  };
+  readonly louvain: {
+    readonly payload: { readonly input: ModernGraphInput };
+    readonly options: WorkerOptions<LouvainOptions>;
+    readonly result: PartitionResult;
+  };
+  readonly leiden: {
+    readonly payload: { readonly input: ModernGraphInput };
+    readonly options: WorkerOptions<LeidenOptions>;
+    readonly result: PartitionResult;
+  };
+  readonly infomap: {
+    readonly payload: { readonly input: ModernGraphInput };
+    readonly options: WorkerOptions<InfomapOptions>;
+    readonly result: PartitionResult;
+  };
+  readonly girvanNewman: {
+    readonly payload: { readonly input: ModernGraphInput };
+    readonly options: WorkerOptions<GirvanNewmanOptions>;
+    readonly result: ReturnType<typeof girvanNewman>;
+  };
+  readonly linkPrediction: {
+    readonly payload: {
+      readonly input: ModernGraphInput;
+      readonly pairs: readonly PredictionPair[];
+      readonly method: LinkPredictionMethod;
+    };
+    readonly options: Record<string, never>;
+    readonly result: PairScoreResult;
+  };
+}
 
 const input = (payload: Record<string, unknown>): GraphInput => payload.input as GraphInput;
 
@@ -82,9 +159,54 @@ const TASKS = {
     if (!statistic) throw new RangeError(`unknown cugTest statistic "${String(p.statistic)}" (worker protocol accepts: ${Object.keys(CUG_STATISTICS).join(", ")})`);
     return cugTest(input(p), statistic, o);
   },
+  pageRank: (p, o) => pageRank(p.input as ModernGraphInput, o),
+  hits: (p, o) => hits(p.input as ModernGraphInput, o),
+  louvain: (p, o) => louvain(p.input as ModernGraphInput, o),
+  leiden: (p, o) => leiden(p.input as ModernGraphInput, o),
+  infomap: (p, o) => infomap(p.input as ModernGraphInput, o),
+  girvanNewman: (p, o) => girvanNewman(p.input as ModernGraphInput, o as unknown as GirvanNewmanOptions),
+  linkPrediction: (p, o) => {
+    const graph = p.input as ModernGraphInput;
+    const pairs = p.pairs as readonly PredictionPair[];
+    switch (p.method as LinkPredictionMethod) {
+      case "commonNeighbors": return commonNeighbors(graph, pairs, o);
+      case "jaccardCoefficient": return jaccardCoefficient(graph, pairs, o);
+      case "adamicAdar": return adamicAdar(graph, pairs, o);
+      case "resourceAllocation": return resourceAllocation(graph, pairs, o);
+      case "preferentialAttachment": return preferentialAttachment(graph, pairs, o);
+      default:
+        throw new RangeError(
+          `unknown link-prediction method "${String(p.method)}" (supported: commonNeighbors, jaccardCoefficient, adamicAdar, resourceAllocation, preferentialAttachment)`,
+        );
+    }
+  },
 } satisfies Record<string, TaskRunner>;
 
 export type SnaWorkerFunction = keyof typeof TASKS;
+
+type LegacySnaWorkerFunction = Exclude<SnaWorkerFunction, keyof SnaTaskMap>;
+
+const SEEDED_COMMUNITY_TASKS: ReadonlySet<SnaWorkerFunction> = new Set(["louvain", "leiden", "infomap"]);
+
+function assertCloneSafeCommunityOptions(fn: SnaWorkerFunction, options: Record<string, unknown>): void {
+  if (!SEEDED_COMMUNITY_TASKS.has(fn)) return;
+  if (Object.prototype.hasOwnProperty.call(options, "rng")) {
+    throw new TypeError(`${fn} Worker options do not accept rng callbacks; pass a structured-clone-safe seed instead`);
+  }
+  for (const [name, value] of Object.entries(options)) {
+    if (typeof value === "function") {
+      throw new TypeError(`${fn} Worker option "${name}" must be structured-clone-safe`);
+    }
+  }
+  const seed = options.seed;
+  if (
+    seed !== undefined &&
+    typeof seed !== "string" &&
+    (typeof seed !== "number" || !Number.isFinite(seed))
+  ) {
+    throw new TypeError(`${fn} Worker seed must be a finite number or string`);
+  }
+}
 
 export interface SnaWorkerRequest {
   readonly sna: true;
@@ -104,11 +226,38 @@ export type SnaWorkerResponse =
  * Execute one protocol request synchronously. Runtime-agnostic: the worker
  * entry below uses it, and Node callers can wire it to `worker_threads`.
  */
-export function executeSnaTask(request: Pick<SnaWorkerRequest, "fn" | "payload" | "options">, cancellation: CancellationOptions = {}): unknown {
+export function executeSnaTask<F extends keyof SnaTaskMap>(
+  request: {
+    readonly fn: F;
+    readonly payload: SnaTaskMap[F]["payload"];
+    readonly options?: SnaTaskMap[F]["options"];
+  },
+  cancellation?: CancellationOptions,
+): SnaTaskMap[F]["result"];
+export function executeSnaTask(
+  request: {
+    readonly fn: LegacySnaWorkerFunction;
+    readonly payload: Record<string, unknown>;
+    readonly options?: Record<string, unknown>;
+  },
+  cancellation?: CancellationOptions,
+): unknown;
+export function executeSnaTask(
+  request: Pick<SnaWorkerRequest, "fn" | "payload" | "options">,
+  cancellation: CancellationOptions = {},
+): unknown {
+  return executeSnaTaskInternal(request, cancellation);
+}
+
+function executeSnaTaskInternal(
+  request: Pick<SnaWorkerRequest, "fn" | "payload" | "options">,
+  cancellation: CancellationOptions = {},
+): unknown {
   const runner: TaskRunner | undefined = TASKS[request.fn];
   if (!runner) throw new RangeError(`unknown sna worker function "${String(request.fn)}" (supported: ${Object.keys(TASKS).join(", ")})`);
   checkAborted(cancellation.signal);
   const options: Record<string, unknown> = { ...(request.options ?? {}) };
+  assertCloneSafeCommunityOptions(request.fn, options);
   if (cancellation.signal) options.signal = cancellation.signal;
   if (cancellation.onProgress) options.onProgress = cancellation.onProgress;
   return runner(request.payload, options);
@@ -137,12 +286,25 @@ export class SnaWorkerClient {
     this.#createWorker = createWorker;
   }
 
+  run<F extends keyof SnaTaskMap>(
+    fn: F,
+    payload: SnaTaskMap[F]["payload"],
+    options?: SnaTaskMap[F]["options"],
+    cancellation?: CancellationOptions,
+  ): Promise<SnaTaskMap[F]["result"]>;
+  run<T = unknown>(
+    fn: LegacySnaWorkerFunction,
+    payload: Record<string, unknown>,
+    options?: Record<string, unknown>,
+    cancellation?: CancellationOptions,
+  ): Promise<T>;
   run<T = unknown>(
     fn: SnaWorkerFunction,
     payload: Record<string, unknown>,
-    options?: Record<string, unknown>,
+    options: Record<string, unknown> = {},
     cancellation: CancellationOptions = {},
   ): Promise<T> {
+    assertCloneSafeCommunityOptions(fn, options);
     const execute = (): Promise<T> =>
       new Promise<T>((resolve, reject) => {
         if (cancellation.signal?.aborted) {
@@ -165,7 +327,7 @@ export class SnaWorkerClient {
           id,
           fn,
           payload,
-          ...(options ? { options } : {}),
+          ...(Object.keys(options).length > 0 ? { options } : {}),
           reportProgress: cancellation.onProgress !== undefined,
         };
         this.#ensureWorker().postMessage(request);
@@ -256,7 +418,7 @@ if (insideWorker) {
       const cancellation: CancellationOptions = request.reportProgress
         ? { onProgress: (completed, total) => post({ sna: true, id: request.id, type: "progress", completed, total } satisfies SnaWorkerResponse) }
         : {};
-      const result = executeSnaTask(request, cancellation);
+      const result = executeSnaTaskInternal(request, cancellation);
       post({ sna: true, id: request.id, type: "result", result } satisfies SnaWorkerResponse);
     } catch (error) {
       const name = error instanceof Error ? error.name : "Error";
