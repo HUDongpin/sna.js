@@ -19,6 +19,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
+      - run: npm run check:parity-metadata
+      - run: npm run check:sample
       - run: npm run typecheck
       - name: Unit + R golden parity tests
         run: npm test
@@ -27,3 +29,55 @@ jobs:
         run: npm run smoke:examples
       - name: Package size budget
         run: npm run size:check
+
+  modern-coverage:
+    runs-on: ubuntu-latest
+    name: Modern API coverage
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run coverage:modern
+
+  browser-worker:
+    runs-on: ubuntu-latest
+    name: Chromium ESM + Worker
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:browser
+
+  packed-consumers:
+    runs-on: ubuntu-latest
+    name: Packed ESM, CJS, and TypeScript consumers
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run smoke:package
+
+  modern-sparse-performance:
+    runs-on: ubuntu-latest
+    name: 10k / 100k sparse performance
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/benchmark-modern.mjs --pretty

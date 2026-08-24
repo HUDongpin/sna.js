@@ -28,26 +28,17 @@ export default defineConfig([
       "worker/index": "src/worker/index.ts",
       "visualization/index": "src/visualization/index.ts",
       "visualization/three": "src/visualization/three.ts",
+      "graph/index": "src/graph/index.ts",
+      "centrality/index": "src/centrality/index.ts",
+      "statistics/index": "src/statistics/index.ts",
+      "community/index": "src/community/index.ts",
+      "prediction/index": "src/prediction/index.ts",
+      "modern/index": "src/modern/index.ts",
     },
     format: ["esm", "cjs"],
     dts: true,
     sourcemap: true,
     clean: true,
-    // `snaR` mirrors the whole API, so a bundled ./compat entry would
-    // duplicate the root bundle (~500 kB in CJS). Emit thin wrappers over the
-    // root entry instead; they become a real entry once the root drops its
-    // deprecated compat re-exports.
-    async onSuccess() {
-      const { writeFile } = await import("node:fs/promises");
-      await writeFile("dist/compat.js", 'export { snaR, onAttach, onLoad } from "./index.js";\n');
-      await writeFile(
-        "dist/compat.cjs",
-        'const root = require("./index.cjs");\nmodule.exports = { snaR: root.snaR, onAttach: root.onAttach, onLoad: root.onLoad };\n',
-      );
-      const dts = 'export { snaR, onAttach, onLoad } from "./index.js";\nexport type { AttachOptions } from "./index.js";\n';
-      await writeFile("dist/compat.d.ts", dts);
-      await writeFile("dist/compat.d.cts", dts.replaceAll("./index.js", "./index.cjs"));
-    },
   },
   {
     // Minified single-file ESM build for CDN (<script type="module">) usage.

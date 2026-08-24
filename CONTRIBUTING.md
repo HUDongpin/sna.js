@@ -17,6 +17,11 @@ npm run check:publish   # everything above + smoke tests + size budget + pack dr
 Node ≥ 20 is required. R is **not** required unless you regenerate parity
 fixtures.
 
+Modern algorithms additionally use committed fixtures generated with pinned
+NetworkX/python-igraph versions plus mathematical invariants. Regenerate them
+with the isolated requirements in `scripts/modern-oracle-requirements.txt`;
+Python remains a development oracle and is never a package dependency.
+
 ## The parity workflow (the important part)
 
 Every ported function must either match R `sna` 2.8 numerically or carry a
@@ -53,7 +58,14 @@ generator script.
   `visualization/`.
 - Zero-based vertex indices in all public APIs.
 - Every new function needs unit tests (including malformed input) and parity
-  cases or a documented divergence.
+  cases, external-oracle fixtures, or a documented invariant/experimental
+  boundary in `docs/CAPABILITY_MATRIX.md`.
+- New modern graph routines must operate on CSR/CSC without constructing a
+  dense `n × n` matrix. Randomized routines require `seed`/`rng` support and
+  canonical node-order results.
+- Do not commit private source workbooks, participant rows, private edge lists,
+  or reversible node-level results. The programming-resilience workbook is a
+  local acceptance input only.
 
 ## Before opening a PR
 
@@ -68,15 +80,14 @@ changes numerical results**, however slightly.
 
 1. Update `CHANGELOG.md`, bump `version` in `package.json` (semver).
 2. `npm run check:publish` on a clean checkout.
-3. Tag `vX.Y.Z`, push, and dispatch the publish workflow against the tag:
-   `gh workflow run publish.yml --ref vX.Y.Z`. It re-runs the full gate and
-   publishes via npm trusted publishing (OIDC + provenance, no stored token).
-   Never hand-edit `dist/`.
-
-   *Status note:* the workflow is ready and the GitHub side verified (OIDC
-   token minted with the npm audience), but the registry's token exchange
-   currently returns 404 — the Trusted Publisher entry on npmjs.com for
-   `@peterhudongpin/sna.js` does not match `HUDongpin`/`sna.js`/`publish.yml`
-   yet. Until that is fixed, publish from a clean tag worktree:
-   `git worktree add /tmp/rel vX.Y.Z && cd /tmp/rel && npm ci && npm publish`
-   (requires the maintainer's npm 2FA).
+3. Configure the npm trusted publisher exactly for owner `HUDongpin`,
+   repository `sna.js`, workflow `publish.yml`, no environment restriction,
+   and the `npm publish` action only. Verify this before creating the final
+   tag.
+4. Merge a green pull request, create and push `vX.Y.Z`, and let the tag-only
+   workflow run. It rejects non-tags and mismatched tag/package/checkout SHAs,
+   re-runs `npm run check:publish`, publishes through OIDC with provenance,
+   verifies npm integrity plus clean consumers and CDN import, then creates the
+   matching GitHub Release receipt.
+5. Never use a local 2FA publish as the normal release path and never hand-edit
+   `dist/`.

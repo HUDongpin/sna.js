@@ -32,6 +32,32 @@ const compatEsm = await import(join(root, "dist/compat.js"));
 const compatCjs = require(join(root, "dist/compat.cjs"));
 check("compat entries load", typeof compatEsm.snaR === "object" && typeof compatCjs.snaR === "object");
 
+const graphEntry = await import(join(root, "dist/graph/index.js"));
+const centralityEntry = await import(join(root, "dist/centrality/index.js"));
+const statisticsEntry = await import(join(root, "dist/statistics/index.js"));
+const communityEntry = await import(join(root, "dist/community/index.js"));
+const predictionEntry = await import(join(root, "dist/prediction/index.js"));
+const modernEntry = await import(join(root, "dist/modern/index.js"));
+const workerEntry = await import(join(root, "dist/worker/index.js"));
+const modernGraph = {
+  directed: false,
+  nodes: [{ id: "a" }, { id: "b" }, { id: "c" }],
+  edges: [{ source: "a", target: "b" }, { source: "b", target: "c" }],
+};
+const sparse = graphEntry.makeSparseGraph(modernGraph);
+check("graph entry builds sparse CSR/CSC", sparse.order === 3 && sparse.size === 2 && sparse.csr.offsets.length === 4);
+const ranks = centralityEntry.pageRank(sparse, { maxIterations: 500 });
+check("centrality entry runs PageRank", ranks.nodes.join(",") === "a,b,c" && Math.abs(ranks.values.reduce((sum, value) => sum + value, 0) - 1) < 1e-10);
+check("statistics entry runs triangles", statisticsEntry.triangles(sparse).values.every((value) => value === 0));
+check("community entry runs Louvain", communityEntry.louvain(sparse, { seed: 5 }).membership.length === 3);
+check("prediction entry runs explicit pairs", predictionEntry.commonNeighbors(sparse, [["a", "c"]]).pairs[0]?.score === 1);
+check("modern aggregate entry loads", typeof modernEntry.pageRank === "function" && typeof modernEntry.makeSparseGraph === "function");
+check("worker entry keeps three runtime exports", Object.keys(workerEntry).length === 3, `${Object.keys(workerEntry).length} exports`);
+check(
+  "worker executes typed modern task",
+  workerEntry.executeSnaTask({ fn: "pageRank", payload: { input: sparse }, options: { maxIterations: 500 } }).values.length === 3,
+);
+
 const { runBasicAnalysis } = await import(join(root, "examples/analysis.mjs"));
 const analysis = runBasicAnalysis();
 check("example analysis runs", analysis.order === 4);

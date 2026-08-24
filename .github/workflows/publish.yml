@@ -1,50 +1,240 @@
 name: Publish to npm
 
-# Manually dispatched against a release tag (e.g. v0.2.0):
-#   gh workflow run publish.yml --ref v0.2.0
-# Publishing uses npm trusted publishing (OIDC): this repository + workflow
-# are configured as a trusted publisher for @peterhudongpin/sna.js on
-# npmjs.com. No npm token is stored; npm >= 11.5 detects the OIDC environment
-# automatically and attaches provenance. Do NOT pass registry-url to
-# setup-node here: it writes an .npmrc with a placeholder NODE_AUTH_TOKEN
-# that overrides the OIDC flow and breaks authentication.
-
+# This workflow is intentionally tag-only. The npm trusted publisher must be
+# configured for owner HUDongpin, repository sna.js, workflow publish.yml, and
+# the npm publish action before a release tag is pushed.
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      # GitHub uses glob syntax here; the shell identity gate below applies the
+      # exact semantic-version regular expression.
+      - "v*.*.*"
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
-  contents: read
+  actions: read
+  contents: write
   id-token: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - run: npm --version
-      - name: OIDC diagnostics
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Pin npm trusted-publishing client
+        run: npm install --global npm@11.5.1
+      - name: Verify release identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
-            echo "OIDC token request URL is present (id-token permission granted)"
-          else
-            echo "OIDC token request URL MISSING - id-token permission not granted"
-          fi
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
-      - run: npm run smoke:examples
-      - run: npm run size:check
-      - name: Verify ref matches package version
-        run: |
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          REF_NAME="${GITHUB_REF_NAME}"
-          if [[ "$REF_NAME" == v* && "$REF_NAME" != "v$PKG_VERSION" ]]; then
-            echo "Tag $REF_NAME does not match package version v$PKG_VERSION" >&2
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" != "tag" || ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Publishing is permitted only from a semantic vX.Y.Z tag" >&2
             exit 1
           fi
-          echo "Publishing $PKG_VERSION from $REF_NAME"
-      - run: npm publish --loglevel http
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if [[ "$GITHUB_REF_NAME" != "v$PACKAGE_VERSION" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match package version v$PACKAGE_VERSION" >&2
+            exit 1
+          fi
+          TAG_SHA=$(git rev-list -n 1 "$GITHUB_REF_NAME")
+          CHECKOUT_SHA=$(git rev-parse HEAD)
+          if [[ "$TAG_SHA" != "$CHECKOUT_SHA" || "$CHECKOUT_SHA" != "$GITHUB_SHA" ]]; then
+            echo "Tag, checkout, and workflow SHA do not match" >&2
+            exit 1
+          fi
+          REGISTRY_VERSION=$(npm view "@peterhudongpin/sna.js@$PACKAGE_VERSION" version 2>/dev/null || true)
+          RELEASE_MODE=publish
+          if [[ "$REGISTRY_VERSION" == "$PACKAGE_VERSION" ]]; then
+            RELEASE_MODE=repair
+          fi
+          git fetch --no-tags origin main
+          MAIN_SHA=$(git rev-parse origin/main)
+          if [[ "$CHECKOUT_SHA" != "$MAIN_SHA" ]]; then
+            if [[ "$RELEASE_MODE" != "repair" ]]; then
+              echo "A first publish requires the release tag to point at the current origin/main HEAD" >&2
+              exit 1
+            fi
+            echo "Repair run: npm already contains $PACKAGE_VERSION; origin/main has advanced to $MAIN_SHA"
+          fi
+          CI_GREEN=false
+          CI_RUN_URL=""
+          CI_RUN_ID=""
+          for attempt in {1..40}; do
+            CI_ROW=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$CHECKOUT_SHA&event=push&per_page=10" --jq '[.workflow_runs[] | select(.status == "completed")][0] | if . then [.conclusion, .html_url, (.id | tostring)] | @tsv else "" end')
+            IFS=$'\t' read -r CI_CONCLUSION CI_RUN_URL CI_RUN_ID <<< "$CI_ROW"
+            if [[ "$CI_CONCLUSION" == "success" ]]; then
+              CI_GREEN=true
+              break
+            fi
+            if [[ -n "$CI_CONCLUSION" && "$CI_CONCLUSION" != "success" ]]; then
+              echo "The main-branch CI workflow concluded $CI_CONCLUSION" >&2
+              exit 1
+            fi
+            sleep 15
+          done
+          if [[ "$CI_GREEN" != "true" ]]; then
+            echo "No successful main-branch CI workflow was found for $CHECKOUT_SHA" >&2
+            exit 1
+          fi
+          NPM_VERSION=$(npm --version)
+          IFS=. read -r NPM_MAJOR NPM_MINOR _ <<< "$NPM_VERSION"
+          if (( NPM_MAJOR < 11 || (NPM_MAJOR == 11 && NPM_MINOR < 5) )); then
+            echo "npm 11.5.1 or newer is required; found $NPM_VERSION" >&2
+            exit 1
+          fi
+          echo "release_version=$PACKAGE_VERSION" >> "$GITHUB_ENV"
+          echo "release_sha=$CHECKOUT_SHA" >> "$GITHUB_ENV"
+          echo "release_mode=$RELEASE_MODE" >> "$GITHUB_ENV"
+          echo "main_ci_url=$CI_RUN_URL" >> "$GITHUB_ENV"
+          echo "main_ci_run_id=$CI_RUN_ID" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Full source, scientific, browser, and package gates
+        run: npm run check:publish
+      - name: Record local tarball identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACK_JSON=$(npm pack --ignore-scripts --json --pack-destination "$RUNNER_TEMP")
+          echo "$PACK_JSON" > "$RUNNER_TEMP/pack.json"
+          echo "local_integrity=$(node -e 'const fs=require("fs"); console.log(JSON.parse(fs.readFileSync(process.argv[1],"utf8"))[0].integrity)' "$RUNNER_TEMP/pack.json")" >> "$GITHUB_ENV"
+          PACK_FILENAME=$(node -e 'const fs=require("fs"); console.log(JSON.parse(fs.readFileSync(process.argv[1],"utf8"))[0].filename)' "$RUNNER_TEMP/pack.json")
+          echo "release_tarball=$RUNNER_TEMP/$PACK_FILENAME" >> "$GITHUB_ENV"
+      - name: Publish with npm trusted publishing and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXISTING_VERSION=$(npm view "@peterhudongpin/sna.js@$release_version" version 2>/dev/null || true)
+          if [[ "$release_mode" == "repair" ]]; then
+            if [[ "$EXISTING_VERSION" != "$release_version" ]]; then
+              echo "Repair mode requires npm to already contain $release_version; refusing a first publish after main advanced" >&2
+              exit 1
+            fi
+            echo "Repairing release $release_version; verification below will reject different bytes or provenance"
+          elif [[ "$EXISTING_VERSION" == "$release_version" ]]; then
+            echo "Registry gained $release_version after the identity gate; continuing as a repair run"
+            release_mode=repair
+            echo "release_mode=repair" >> "$GITHUB_ENV"
+          else
+            npm publish "$release_tarball" --access public --provenance --ignore-scripts
+          fi
+      - name: Verify npm registry identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            REGISTRY_VERSION=$(npm view "@peterhudongpin/sna.js@$release_version" version 2>/dev/null || true)
+            REGISTRY_LATEST=$(npm view "@peterhudongpin/sna.js" dist-tags.latest 2>/dev/null || true)
+            if [[ "$REGISTRY_VERSION" == "$release_version" && "$REGISTRY_LATEST" == "$release_version" ]]; then break; fi
+            sleep 10
+          done
+          if [[ "$REGISTRY_VERSION" != "$release_version" || "$REGISTRY_LATEST" != "$release_version" ]]; then
+            echo "npm registry did not expose $release_version as latest" >&2
+            exit 1
+          fi
+          REGISTRY_INTEGRITY=$(npm view "@peterhudongpin/sna.js@$release_version" dist.integrity)
+          if [[ "$REGISTRY_INTEGRITY" != "$local_integrity" ]]; then
+            echo "npm integrity mismatch" >&2
+            exit 1
+          fi
+          ATTESTATION_URL=""
+          for attempt in {1..12}; do
+            npm view "@peterhudongpin/sna.js@$release_version" dist.attestations --json > "$RUNNER_TEMP/attestations.json" || true
+            if ATTESTATION_URL=$(node -e 'const fs=require("fs"); const a=JSON.parse(fs.readFileSync(process.argv[1],"utf8")||"null"); if(a?.provenance?.predicateType!=="https://slsa.dev/provenance/v1" || typeof a.url!=="string") process.exit(1); console.log(a.url)' "$RUNNER_TEMP/attestations.json" 2>/dev/null); then
+              break
+            fi
+            sleep 10
+          done
+          if [[ -z "$ATTESTATION_URL" ]]; then
+            echo "npm provenance attestation did not become available" >&2
+            exit 1
+          fi
+          echo "registry_integrity=$REGISTRY_INTEGRITY" >> "$GITHUB_ENV"
+          echo "registry_attestation_url=$ATTESTATION_URL" >> "$GITHUB_ENV"
+      - name: Clean registry consumer install
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONSUMER_DIR=$(mktemp -d)
+          cd "$CONSUMER_DIR"
+          npm init -y >/dev/null
+          npm pkg set type=module >/dev/null
+          npm install --ignore-scripts --no-audit --no-fund --omit=optional "@peterhudongpin/sna.js@$release_version"
+          node --input-type=module -e 'import("@peterhudongpin/sna.js/modern").then(m => { if (typeof m.pageRank !== "function") process.exit(1); })'
+          node -e 'const m=require("@peterhudongpin/sna.js"); if(typeof m.degree!=="function") process.exit(1)'
+          cat > consumer.ts <<'EOF'
+          import { makeSparseGraph, type GraphData } from "@peterhudongpin/sna.js/graph";
+          import { pageRank } from "@peterhudongpin/sna.js/centrality";
+          import { snaR, type AttachOptions } from "@peterhudongpin/sna.js/compat";
+          const data: GraphData<"a" | "b"> = { directed: false, nodes: [{ id: "a" }, { id: "b" }], edges: [{ source: "a", target: "b" }] };
+          const graph = makeSparseGraph(data);
+          const id: "a" | "b" = graph.nodeIds[0]!;
+          const options: AttachOptions = { version: "0.5.0" };
+          void pageRank(graph); void snaR; void id; void options;
+          EOF
+          "$GITHUB_WORKSPACE/node_modules/.bin/tsc" --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext consumer.ts
+          npm audit signatures
+          node "$GITHUB_WORKSPACE/scripts/verify-npm-provenance.mjs" \
+            "$registry_attestation_url" \
+            "@peterhudongpin/sna.js" \
+            "$release_version" \
+            "https://github.com/HUDongpin/sna.js" \
+            ".github/workflows/publish.yml" \
+            "refs/tags/v$release_version" \
+            "$release_sha" \
+            "$registry_integrity" > "$RUNNER_TEMP/provenance-receipt.json"
+          cat "$RUNNER_TEMP/provenance-receipt.json"
+          echo "provenance_invocation=$(node -e 'const r=require(process.argv[1]); console.log(r.invocationId ?? "")' "$RUNNER_TEMP/provenance-receipt.json")" >> "$GITHUB_ENV"
+      - name: Browser CDN import
+        env:
+          SNA_CDN_BASE: https://cdn.jsdelivr.net/npm/@peterhudongpin/sna.js@${{ env.release_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if node scripts/browser-smoke.mjs; then exit 0; fi
+            echo "CDN import not ready (attempt $attempt/12); retrying in 10 seconds"
+            sleep 10
+          done
+          echo "CDN import did not become available" >&2
+          exit 1
+      - name: Create GitHub Release receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx vitest run --reporter=json --outputFile="$RUNNER_TEMP/vitest.json"
+          TEST_COUNT=$(node -e 'const r=require(process.argv[1]); if(!r.success || r.numFailedTests!==0) process.exit(1); console.log(r.numPassedTests)' "$RUNNER_TEMP/vitest.json")
+          SYNTHETIC_SHA=$(sha256sum examples/data/programming-resilience.synthetic.csv | cut -d' ' -f1)
+          cat > "$RUNNER_TEMP/release-notes.md" <<EOF
+          npm: @peterhudongpin/sna.js@$release_version
+          release mode: $release_mode
+          tag SHA: $release_sha
+          npm integrity: $registry_integrity
+          npm provenance: $registry_attestation_url
+          npm provenance build: $provenance_invocation
+          R parity: 17 graphs / 211 cases / 35 function families
+          Tests: $TEST_COUNT passed
+          Public synthetic sample: 240 rows, SHA-256 $SYNTHETIC_SHA
+          Private workbook aggregate receipt: SHA-256 043fb5d66e70085c757939aa6082877c3392204156e3e986ac56fab967819434; item graph 16 nodes/32 edges; respondent graph 811 nodes/4,559 edges/1 component. No private row or node-level output is published.
+          Main CI: $main_ci_url (run $main_ci_run_id; Node 20/22/24 and release gates)
+          Validation: Chromium root/modern ESM + Worker, 10k/100k sparse benchmark, registry ESM/CJS/TypeScript consumers, verified npm attestation identity
+          EOF
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
