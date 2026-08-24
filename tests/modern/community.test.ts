@@ -209,6 +209,25 @@ describe("disjoint community detection", () => {
     expect(result.meta.exact).toBe(true);
   });
 
+  it("keeps weighted Girvan-Newman shortest paths invariant under distance scaling", () => {
+    const graph = (scale: number): GraphData<number> => ({
+      directed: false,
+      nodes: [0, 1, 2, 3].map((id) => ({ id })),
+      edges: [
+        { source: 0, target: 3, weight: 1.25 * scale },
+        { source: 2, target: 3, weight: 2 * scale },
+        { source: 0, target: 2, weight: 1.5 * scale },
+        { source: 1, target: 3, weight: 1.25 * scale },
+      ],
+    });
+
+    const unit = girvanNewman(graph(1), { levels: 1, useWeights: true });
+    const tiny = girvanNewman(graph(1e-12), { levels: 1, useWeights: true });
+    expect(unit.levels[0]!.communities).toEqual([[0, 2, 3], [1]]);
+    expect(tiny.levels[0]!.communities).toEqual(unit.levels[0]!.communities);
+    expect(tiny.meta.iterations).toBe(unit.meta.iterations);
+  });
+
   it("adapts seeded label propagation to stable node identities", () => {
     const disconnected: GraphData<string> = {
       directed: false,
@@ -228,6 +247,19 @@ describe("disjoint community detection", () => {
     expect(first.communities).toEqual([["a", "b", "c"], ["x", "y", "z"]]);
     expect(first.meta).toMatchObject({ algorithm: "label-propagation", seed: 9, converged: true });
     expectCanonicalPartition(first);
+  });
+
+  it("treats zero-strength edges as no label-propagation vote", () => {
+    const zeroStrengthPair: GraphData<string> = {
+      directed: false,
+      nodes: [{ id: "a" }, { id: "b" }],
+      edges: [{ source: "a", target: "b", weight: 0 }],
+    };
+
+    const result = labelPropagation(zeroStrengthPair, { seed: 9 });
+    expect(result.communities).toEqual([["a"], ["b"]]);
+    expect(result.membership).toEqual([0, 1]);
+    expect(result.meta.converged).toBe(true);
   });
 
   it("checks cancellation in iterative algorithms", () => {

@@ -97,6 +97,7 @@ function normalizeGraphData(input: GraphData, options: MakeSparseGraphOptions): 
   if (typeof input.directed !== "boolean") throw new TypeError("GraphData directed must be a boolean");
   if (!Array.isArray(input.nodes)) throw new TypeError("GraphData nodes must be an array");
   if (!Array.isArray(input.edges)) throw new TypeError("GraphData edges must be an array");
+  const directed = resolveDirected(input.directed, options);
   const nodeIds: NodeId[] = [];
   const nodeAttributes: GraphAttributes[] = [];
   const nodeIndex = new Map<NodeId, number>();
@@ -125,19 +126,28 @@ function normalizeGraphData(input: GraphData, options: MakeSparseGraphOptions): 
     if (source === undefined) throw new RangeError(`edge ${edgeIndex} source node is not declared: ${String(edge.source)}`);
     if (target === undefined) throw new RangeError(`edge ${edgeIndex} target node is not declared: ${String(edge.target)}`);
     if (!loops && source === target) continue;
-    edges.push({
-      source,
-      target,
+    const mirrorUndirectedEdge = directed && !input.directed && source !== target;
+    const item: IndexedEdge = {
+      source: mirrorUndirectedEdge ? Math.min(source, target) : source,
+      target: mirrorUndirectedEdge ? Math.max(source, target) : target,
       weight: normalizeWeight(edge.weight, `edge ${edgeIndex} weight`),
       attributes: normalizeAttributes(edge.attributes, `attributes for edge ${edgeIndex}`),
-    });
+    };
+    edges.push(item);
+    // A GraphData edge is one undirected logical edge when input.directed is
+    // false.  If the caller explicitly overrides that graph to directed, keep
+    // both arcs just as normalizeSparseGraph does for the equivalent staged
+    // conversion.  Loops remain single logical edges.
+    if (mirrorUndirectedEdge) {
+      edges.push({ source: item.target, target: item.source, weight: item.weight, attributes: item.attributes });
+    }
   }
 
   return {
     nodeIds,
     nodeAttributes,
     edges,
-    directed: resolveDirected(input.directed, options),
+    directed,
     loops,
     attributes: normalizeAttributes(input.attributes, "graph attributes"),
   };
@@ -145,6 +155,7 @@ function normalizeGraphData(input: GraphData, options: MakeSparseGraphOptions): 
 
 function normalizeLegacyEdgeList(input: EdgeListInput, options: MakeSparseGraphOptions): NormalizedGraph {
   const indexBase = options.indexBase ?? input.indexBase ?? 0;
+  const directed = resolveDirected(input.directed, options);
   let order = input.order ?? 0;
   if (!Number.isInteger(order) || order < 0) throw new RangeError("edge-list order must be a non-negative integer");
 
@@ -162,7 +173,17 @@ function normalizeLegacyEdgeList(input: EdgeListInput, options: MakeSparseGraphO
     const rawWeight = edge[2] ?? 1;
     // Legacy NaN represents a missing tie and non-finite values are no ties.
     if (!Number.isFinite(rawWeight)) continue;
-    edges.push({ source, target, weight: rawWeight, attributes: EMPTY_ATTRIBUTES });
+    const mirrorUndirectedEdge = directed && input.directed === false && source !== target;
+    const item: IndexedEdge = {
+      source: mirrorUndirectedEdge ? Math.min(source, target) : source,
+      target: mirrorUndirectedEdge ? Math.max(source, target) : target,
+      weight: rawWeight,
+      attributes: EMPTY_ATTRIBUTES,
+    };
+    edges.push(item);
+    if (mirrorUndirectedEdge) {
+      edges.push({ source: item.target, target: item.source, weight: item.weight, attributes: item.attributes });
+    }
   }
 
   if (order > MAX_UINT32) throw new RangeError("sparse graph order exceeds Uint32 capacity");
@@ -170,7 +191,7 @@ function normalizeLegacyEdgeList(input: EdgeListInput, options: MakeSparseGraphO
     nodeIds: Array.from({ length: order }, (_, index) => index),
     nodeAttributes: Array.from({ length: order }, () => EMPTY_ATTRIBUTES),
     edges,
-    directed: resolveDirected(input.directed, options),
+    directed,
     loops,
     attributes: EMPTY_ATTRIBUTES,
   };

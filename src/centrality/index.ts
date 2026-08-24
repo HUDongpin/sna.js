@@ -400,7 +400,14 @@ function weightedDistances(
       const strength = adjacency.weights[entry]!;
       if (strength === 0) continue;
       const target = adjacency.indices[entry]!;
-      const candidate = item.distance + 1 / strength;
+      const stepDistance = 1 / strength;
+      if (!(stepDistance > 0) || !Number.isFinite(stepDistance)) {
+        throw new RangeError("harmonic centrality requires finite inverse-strength distances");
+      }
+      const candidate = item.distance + stepDistance;
+      if (!Number.isFinite(candidate)) {
+        throw new RangeError("harmonic centrality path distances must remain finite");
+      }
       if (candidate < distances[target]!) {
         distances[target] = candidate;
         heap.push(target, candidate);
@@ -412,11 +419,14 @@ function weightedDistances(
 
 /** Harmonic centrality using hops or inverse-strength shortest paths. */
 export function harmonicCentrality(input: ModernGraphInput, options: HarmonicCentralityOptions = {}): NodeScoreResult {
+  const direction = options.direction ?? "out";
+  if (direction !== "out" && direction !== "in") {
+    throw new RangeError('harmonic centrality direction must be "out" or "in"');
+  }
   const graph = makeSparseGraph(input, options);
   assertStrengths(graph);
   checkAborted(options.signal);
   const weighted = options.weighted ?? true;
-  const direction = options.direction ?? "out";
   const adjacency = direction === "out" ? graph.csr : graph.csc;
   const values = Array.from({ length: graph.order }, () => 0);
 
@@ -429,7 +439,16 @@ export function harmonicCentrality(input: ModernGraphInput, options: HarmonicCen
     for (let target = 0; target < graph.order; target += 1) {
       if (target === source) continue;
       const distance = distances[target]!;
-      if (Number.isFinite(distance) && distance > 0) score += 1 / distance;
+      if (Number.isFinite(distance) && distance > 0) {
+        const contribution = 1 / distance;
+        if (!Number.isFinite(contribution)) {
+          throw new RangeError("harmonic centrality reciprocal contribution must remain finite");
+        }
+        score += contribution;
+        if (!Number.isFinite(score)) {
+          throw new RangeError("harmonic centrality score must remain finite");
+        }
+      }
     }
     values[source] = options.normalized && graph.order > 1 ? score / (graph.order - 1) : score;
     options.onProgress?.(source + 1, graph.order);

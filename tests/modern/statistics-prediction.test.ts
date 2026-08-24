@@ -88,6 +88,20 @@ describe("modern clustering statistics", () => {
     expect(result.meta.valueSemantics).toBe("strength");
   });
 
+  it.each([1e-200, 1e200])("keeps Onnela clustering scale-invariant at weight %s", (weight) => {
+    const weightedTriangle = {
+      directed: false,
+      nodes: [{ id: "a" }, { id: "b" }, { id: "c" }],
+      edges: [
+        { source: "a", target: "b", weight },
+        { source: "a", target: "c", weight },
+        { source: "b", target: "c", weight },
+      ],
+    } satisfies GraphData;
+
+    expect(clusteringCoefficient(weightedTriangle, { weighted: true }).values).toEqual([1, 1, 1]);
+  });
+
   it("implements Fagiolo directed clustering while triangles stays undirected-only", () => {
     const directedCycle = {
       directed: true,
@@ -144,6 +158,31 @@ describe("modern assortativity and mixing", () => {
       [2, 1],
       [1, 2],
     ]);
+  });
+
+  it.each([1e-10, 1e-200, 1e200])("keeps numeric assortativity scale-invariant at attribute scale %s", (scale) => {
+    const numericTriangle = (scale: number) =>
+      ({
+        directed: false,
+        nodes: [
+          { id: 0, attributes: { score: 0 } },
+          { id: 1, attributes: { score: scale } },
+          { id: 2, attributes: { score: 2 * scale } },
+        ],
+        edges: [
+          { source: 0, target: 1 },
+          { source: 0, target: 2 },
+          { source: 1, target: 2 },
+        ],
+      }) satisfies GraphData;
+
+    const reference = numericAssortativity(numericTriangle(1), "score");
+    const scaled = numericAssortativity(numericTriangle(scale), "score");
+
+    expect(reference.value).toBeCloseTo(-0.5, 12);
+    expect(scaled.value).not.toBeNull();
+    expect(scaled.value).toBeCloseTo(reference.value ?? Number.NaN, 12);
+    expect(scaled.meta.warnings).toEqual([]);
   });
 
   it("returns JSON-safe null for an undefined constant-endpoint correlation", () => {

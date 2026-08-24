@@ -325,6 +325,49 @@ describe("harmonicCentrality", () => {
     expect(harmonicCentrality(chain, { weighted: false, normalized: true }).values).toEqual([0.75, 0.5, 0]);
   });
 
+  it("rejects invalid direction values and non-finite weighted-distance arithmetic", () => {
+    expect(() => harmonicCentrality(chain, { direction: "sideways" as never })).toThrow(
+      new RangeError('harmonic centrality direction must be "out" or "in"'),
+    );
+
+    const tinyStrength: GraphData = {
+      directed: true,
+      nodes: [{ id: "a" }, { id: "b" }],
+      edges: [{ source: "a", target: "b", weight: Number.MIN_VALUE }],
+    };
+    expect(() => harmonicCentrality(tinyStrength)).toThrow(/finite inverse-strength distances/i);
+
+    const pathDistanceOverflow: GraphData = {
+      directed: true,
+      nodes: [{ id: "a" }, { id: "b" }, { id: "c" }],
+      edges: [
+        { source: "a", target: "b", weight: 1e-308 },
+        { source: "b", target: "c", weight: 1e-308 },
+      ],
+    };
+    expect(() => harmonicCentrality(pathDistanceOverflow)).toThrow(/path distances must remain finite/i);
+  });
+
+  it("rejects reciprocal and accumulated harmonic scores that overflow", () => {
+    const reciprocalOverflow: GraphData = {
+      directed: true,
+      nodes: [{ id: "a" }, { id: "b" }],
+      edges: [{ source: "a", target: "b", weight: Number.MAX_VALUE }],
+    };
+    expect(() => harmonicCentrality(reciprocalOverflow)).toThrow(/reciprocal contribution must remain finite/i);
+
+    const accumulatedOverflow: GraphData = {
+      directed: true,
+      nodes: [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }],
+      edges: [
+        { source: "a", target: "b", weight: Number.MAX_VALUE / 2 },
+        { source: "a", target: "c", weight: Number.MAX_VALUE / 2 },
+        { source: "a", target: "d", weight: Number.MAX_VALUE / 2 },
+      ],
+    };
+    expect(() => harmonicCentrality(accumulatedOverflow)).toThrow(/score must remain finite/i);
+  });
+
   it("reports progress and honors AbortSignal", () => {
     const progress: Array<[number, number]> = [];
     harmonicCentrality(chain, { onProgress: (done, total) => progress.push([done, total]) });

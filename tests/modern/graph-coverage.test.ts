@@ -133,6 +133,75 @@ describe("graph normalization branch coverage", () => {
     expect(createGraph(data, { diag: false, loops: true }).loops).toBe(true);
   });
 
+  it("mirrors undirected GraphData edges when direction is overridden and matches staged sparse conversion", () => {
+    const data: GraphData = {
+      directed: false,
+      nodes: [{ id: "a" }, { id: "b" }, { id: "c" }],
+      edges: [
+        { source: "a", target: "a", weight: 7, attributes: { kind: "loop" } },
+        { source: "b", target: "a", weight: 2, attributes: { kind: "ab" } },
+        { source: "c", target: "b", weight: 3, attributes: { kind: "bc" } },
+      ],
+    };
+
+    const direct = createGraph(data, { mode: "digraph" });
+    const staged = makeSparseGraph(createGraph(data), { directed: true });
+    expect(direct).toEqual(staged);
+    expect(toLegacyEdgeList(direct).edges).toEqual([
+      [0, 0, 7],
+      [0, 1, 2],
+      [1, 0, 2],
+      [1, 2, 3],
+      [2, 1, 3],
+    ]);
+    expect(direct.edgeAttributes).toEqual([
+      { kind: "loop" },
+      { kind: "ab" },
+      { kind: "ab" },
+      { kind: "bc" },
+      { kind: "bc" },
+    ]);
+  });
+
+  it("mirrors an explicitly undirected legacy edge list when direction is overridden", () => {
+    const input = {
+      directed: false,
+      order: 3,
+      edges: [
+        [1, 0, 2],
+        [2, 1, 3],
+      ],
+    } as const;
+
+    const direct = makeSparseGraph(input, { directed: true });
+    const staged = makeSparseGraph(makeSparseGraph(input), { directed: true });
+    expect(direct).toEqual(staged);
+    expect(toLegacyEdgeList(direct).edges).toEqual([
+      [0, 1, 2],
+      [1, 0, 2],
+      [1, 2, 3],
+      [2, 1, 3],
+    ]);
+  });
+
+  it("canonicalizes the reverse directed-to-undirected override through the explicit duplicate policy", () => {
+    const reciprocal: GraphData = {
+      directed: true,
+      nodes: [{ id: "a" }, { id: "b" }],
+      edges: [
+        { source: "a", target: "b", weight: 2, attributes: { selected: "first" } },
+        { source: "b", target: "a", weight: 3, attributes: { selected: "last" } },
+      ],
+    };
+
+    expect(() => createGraph(reciprocal, { mode: "graph" })).toThrow(/duplicate edge/i);
+    const direct = createGraph(reciprocal, { mode: "graph", duplicateEdges: "sum" });
+    const staged = makeSparseGraph(createGraph(reciprocal), { directed: false, duplicateEdges: "sum" });
+    expect(direct).toEqual(staged);
+    expect(toLegacyEdgeList(direct).edges).toEqual([[0, 1, 5]]);
+    expect(direct.edgeAttributes).toEqual([{ selected: "first" }]);
+  });
+
   it("distinguishes GraphData from tuple edge lists even without a nodes discriminator", () => {
     const objectEdges = {
       directed: true,

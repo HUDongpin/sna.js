@@ -20,6 +20,7 @@ import type {
 } from "../modern/types";
 
 const DEFAULT_TOLERANCE = 1e-10;
+const PATH_DISTANCE_RELATIVE_TOLERANCE = 16 * Number.EPSILON;
 
 export type PartitionInput =
   | ReadonlyArray<ReadonlyArray<NodeId>>
@@ -575,6 +576,7 @@ export function labelPropagation(input: ModernGraphInput, options: LabelPropagat
     for (const node of order) {
       const strengths = new Map<number, number>();
       for (const [neighbor, weight] of view.neighbors[node]!) {
+        if (weight === 0) continue;
         const label = labels[neighbor]!;
         strengths.set(label, (strengths.get(label) ?? 0) + weight);
       }
@@ -1772,11 +1774,12 @@ function edgeBetweenness(
         stack.push(vertex);
         for (const edge of incident[vertex]!) {
           const alternate = distance[vertex]! + edge.distance;
-          if (alternate < distance[edge.neighbor]! - DEFAULT_TOLERANCE) {
+          const comparison = comparePathDistances(alternate, distance[edge.neighbor]!);
+          if (comparison < 0) {
             distance[edge.neighbor] = alternate;
             sigma[edge.neighbor] = sigma[vertex]!;
             predecessors[edge.neighbor] = [{ neighbor: vertex, edge: edge.edge, distance: edge.distance }];
-          } else if (Math.abs(alternate - distance[edge.neighbor]!) <= DEFAULT_TOLERANCE) {
+          } else if (comparison === 0 && Number.isFinite(alternate)) {
             sigma[edge.neighbor] = sigma[edge.neighbor]! + sigma[vertex]!;
             predecessors[edge.neighbor]!.push({ neighbor: vertex, edge: edge.edge, distance: edge.distance });
           }
@@ -1812,6 +1815,15 @@ function edgeBetweenness(
     }
   }
   return scores.map((score) => score / 2);
+}
+
+function comparePathDistances(left: number, right: number): number {
+  if (left === right) return 0;
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return left < right ? -1 : 1;
+  const scale = Math.max(Math.abs(left), Math.abs(right), Number.MIN_VALUE);
+  const tolerance = PATH_DISTANCE_RELATIVE_TOLERANCE * scale;
+  if (Math.abs(left - right) <= tolerance) return 0;
+  return left < right ? -1 : 1;
 }
 
 function maximalCliques(

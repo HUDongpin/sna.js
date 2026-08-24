@@ -180,20 +180,29 @@ function endpointSamples(graph: SparseGraph, sourceValues: readonly number[], ta
 
 function pearson(source: readonly number[], target: readonly number[]): number | null {
   if (source.length === 0 || source.length !== target.length) return null;
-  const sourceMean = source.reduce((sum, value) => sum + value, 0) / source.length;
-  const targetMean = target.reduce((sum, value) => sum + value, 0) / target.length;
+  let sourceScale = 0;
+  let targetScale = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    sourceScale = Math.max(sourceScale, Math.abs(source[index] ?? 0));
+    targetScale = Math.max(targetScale, Math.abs(target[index] ?? 0));
+  }
+  if (sourceScale === 0 || targetScale === 0) return null;
+
+  const sourceMean = source.reduce((sum, value) => sum + value / sourceScale, 0) / source.length;
+  const targetMean = target.reduce((sum, value) => sum + value / targetScale, 0) / target.length;
   let covariance = 0;
   let sourceVariance = 0;
   let targetVariance = 0;
   for (let index = 0; index < source.length; index += 1) {
-    const sourceDelta = (source[index] ?? 0) - sourceMean;
-    const targetDelta = (target[index] ?? 0) - targetMean;
+    const sourceDelta = (source[index] ?? 0) / sourceScale - sourceMean;
+    const targetDelta = (target[index] ?? 0) / targetScale - targetMean;
     covariance += sourceDelta * targetDelta;
     sourceVariance += sourceDelta * sourceDelta;
     targetVariance += targetDelta * targetDelta;
   }
-  const denominator = Math.sqrt(sourceVariance * targetVariance);
-  if (!Number.isFinite(denominator) || denominator <= EPSILON) return null;
+  if (sourceVariance === 0 || targetVariance === 0) return null;
+  const denominator = Math.sqrt(sourceVariance) * Math.sqrt(targetVariance);
+  if (!Number.isFinite(denominator) || denominator === 0) return null;
   return covariance / denominator;
 }
 
@@ -258,8 +267,10 @@ function undirectedClustering(graph: SparseGraph, view: NeighborView, weighted: 
       for (let rightIndex = leftIndex + 1; rightIndex < neighbors.length; rightIndex += 1) {
         const right = neighbors[rightIndex]!;
         if (!view.outSets[left]!.has(right)) continue;
-        const product = edgeWeight(view, node, left) * edgeWeight(view, node, right) * edgeWeight(view, left, right);
-        strength += Math.cbrt(product) / maximum;
+        const leftWeight = edgeWeight(view, node, left) / maximum;
+        const rightWeight = edgeWeight(view, node, right) / maximum;
+        const closingWeight = edgeWeight(view, left, right) / maximum;
+        strength += Math.cbrt(leftWeight * rightWeight * closingWeight);
       }
     }
     return (2 * strength) / (degree * (degree - 1));

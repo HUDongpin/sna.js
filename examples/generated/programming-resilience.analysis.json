@@ -152,7 +152,7 @@
       }
     },
     "degreeAssortativity": {
-      "value": 0.05232452142206018,
+      "value": 0.05232452142206017,
       "meta": {
         "algorithm": "degreeAssortativity",
         "directed": false,
@@ -2177,7 +2177,7 @@
       }
     },
     "degreeAssortativity": {
-      "value": -0.034796835268442655,
+      "value": -0.03479683526844288,
       "meta": {
         "algorithm": "degreeAssortativity",
         "directed": false,

@@ -71,7 +71,8 @@ const CUG_STATISTICS: Record<string, CugTestStatistic> = {
 
 type TaskRunner = (payload: Record<string, unknown>, options: Record<string, unknown>) => unknown;
 
-type WorkerOptions<T> = Omit<T, keyof CancellationOptions>;
+/** Options that can cross a structured-clone boundary without callbacks. */
+type WorkerOptions<T> = Omit<T, keyof CancellationOptions | "rng">;
 
 export type LinkPredictionMethod =
   | "commonNeighbors"
@@ -183,6 +184,30 @@ const TASKS = {
 
 export type SnaWorkerFunction = keyof typeof TASKS;
 
+type LegacySnaWorkerFunction = Exclude<SnaWorkerFunction, keyof SnaTaskMap>;
+
+const SEEDED_COMMUNITY_TASKS: ReadonlySet<SnaWorkerFunction> = new Set(["louvain", "leiden", "infomap"]);
+
+function assertCloneSafeCommunityOptions(fn: SnaWorkerFunction, options: Record<string, unknown>): void {
+  if (!SEEDED_COMMUNITY_TASKS.has(fn)) return;
+  if (Object.prototype.hasOwnProperty.call(options, "rng")) {
+    throw new TypeError(`${fn} Worker options do not accept rng callbacks; pass a structured-clone-safe seed instead`);
+  }
+  for (const [name, value] of Object.entries(options)) {
+    if (typeof value === "function") {
+      throw new TypeError(`${fn} Worker option "${name}" must be structured-clone-safe`);
+    }
+  }
+  const seed = options.seed;
+  if (
+    seed !== undefined &&
+    typeof seed !== "string" &&
+    (typeof seed !== "number" || !Number.isFinite(seed))
+  ) {
+    throw new TypeError(`${fn} Worker seed must be a finite number or string`);
+  }
+}
+
 export interface SnaWorkerRequest {
   readonly sna: true;
   readonly id: number;
@@ -210,10 +235,21 @@ export function executeSnaTask<F extends keyof SnaTaskMap>(
   cancellation?: CancellationOptions,
 ): SnaTaskMap[F]["result"];
 export function executeSnaTask(
-  request: Pick<SnaWorkerRequest, "fn" | "payload" | "options">,
+  request: {
+    readonly fn: LegacySnaWorkerFunction;
+    readonly payload: Record<string, unknown>;
+    readonly options?: Record<string, unknown>;
+  },
   cancellation?: CancellationOptions,
 ): unknown;
 export function executeSnaTask(
+  request: Pick<SnaWorkerRequest, "fn" | "payload" | "options">,
+  cancellation: CancellationOptions = {},
+): unknown {
+  return executeSnaTaskInternal(request, cancellation);
+}
+
+function executeSnaTaskInternal(
   request: Pick<SnaWorkerRequest, "fn" | "payload" | "options">,
   cancellation: CancellationOptions = {},
 ): unknown {
@@ -221,6 +257,7 @@ export function executeSnaTask(
   if (!runner) throw new RangeError(`unknown sna worker function "${String(request.fn)}" (supported: ${Object.keys(TASKS).join(", ")})`);
   checkAborted(cancellation.signal);
   const options: Record<string, unknown> = { ...(request.options ?? {}) };
+  assertCloneSafeCommunityOptions(request.fn, options);
   if (cancellation.signal) options.signal = cancellation.signal;
   if (cancellation.onProgress) options.onProgress = cancellation.onProgress;
   return runner(request.payload, options);
@@ -256,7 +293,7 @@ export class SnaWorkerClient {
     cancellation?: CancellationOptions,
   ): Promise<SnaTaskMap[F]["result"]>;
   run<T = unknown>(
-    fn: SnaWorkerFunction,
+    fn: LegacySnaWorkerFunction,
     payload: Record<string, unknown>,
     options?: Record<string, unknown>,
     cancellation?: CancellationOptions,
@@ -267,6 +304,7 @@ export class SnaWorkerClient {
     options: Record<string, unknown> = {},
     cancellation: CancellationOptions = {},
   ): Promise<T> {
+    assertCloneSafeCommunityOptions(fn, options);
     const execute = (): Promise<T> =>
       new Promise<T>((resolve, reject) => {
         if (cancellation.signal?.aborted) {
@@ -380,7 +418,7 @@ if (insideWorker) {
       const cancellation: CancellationOptions = request.reportProgress
         ? { onProgress: (completed, total) => post({ sna: true, id: request.id, type: "progress", completed, total } satisfies SnaWorkerResponse) }
         : {};
-      const result = executeSnaTask(request, cancellation);
+      const result = executeSnaTaskInternal(request, cancellation);
       post({ sna: true, id: request.id, type: "result", result } satisfies SnaWorkerResponse);
     } catch (error) {
       const name = error instanceof Error ? error.name : "Error";

@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { GraphData, NodeScoreResult, PairScoreResult, PartitionResult } from "../../src/modern/types";
-import { executeSnaTask, type SnaTaskMap } from "../../src/worker/index";
+import {
+  createSnaWorker,
+  executeSnaTask,
+  type SnaTaskMap,
+  type SnaWorkerFunction,
+  type SnaWorkerRequest,
+} from "../../src/worker/index";
 
 const cycle: GraphData = {
   directed: false,
@@ -13,6 +19,31 @@ const cycle: GraphData = {
     { source: "d", target: "a" },
   ],
 };
+
+function assertCloneSafeWorkerOptionTypes(): void {
+  const seeded: SnaTaskMap["louvain"]["options"] = { seed: "clone-safe" };
+  void seeded;
+  // @ts-expect-error rng callbacks cannot be structured-cloned into a Worker.
+  const louvainRng: SnaTaskMap["louvain"]["options"] = { rng: () => 0.5 };
+  // @ts-expect-error rng callbacks cannot be structured-cloned into a Worker.
+  const leidenRng: SnaTaskMap["leiden"]["options"] = { rng: () => 0.5 };
+  // @ts-expect-error rng callbacks cannot be structured-cloned into a Worker.
+  const infomapRng: SnaTaskMap["infomap"]["options"] = { rng: () => 0.5 };
+  void louvainRng;
+  void leidenRng;
+  void infomapRng;
+
+  // The compatibility overload remains available for every pre-0.5 task.
+  const client = createSnaWorker(() => null as never);
+  const legacyDegree: Promise<number[]> = client.run<number[]>("degree", { input: [] }, { mode: "graph" });
+  void legacyDegree;
+  // @ts-expect-error modern task overloads must not fall through to the legacy generic overload.
+  client.run("louvain", { input: cycle }, { rng: () => 0.5 });
+  // @ts-expect-error executeSnaTask likewise accepts only clone-safe modern options.
+  executeSnaTask({ fn: "infomap", payload: { input: cycle }, options: { rng: () => 0.5 } });
+}
+
+void assertCloneSafeWorkerOptionTypes;
 
 describe("typed modern Worker protocol", () => {
   it("runs PageRank and HITS with inferred structured-clone-safe results", () => {
@@ -33,6 +64,52 @@ describe("typed modern Worker protocol", () => {
     const result: PartitionResult = executeSnaTask(request);
     expect(result.membership).toHaveLength(4);
     expect(new Set(result.membership).size).toBe(result.communities.length);
+  });
+
+  it.each(["louvain", "leiden", "infomap"] as const)("rejects non-clone-safe %s rng options before execution", (fn) => {
+    const executeUnchecked = executeSnaTask as unknown as (
+      request: Pick<SnaWorkerRequest, "fn" | "payload" | "options">,
+    ) => unknown;
+    expect(() => executeUnchecked({ fn, payload: { input: cycle }, options: { rng: () => 0.5 } })).toThrow(
+      /do not accept rng callbacks.*structured-clone-safe seed/i,
+    );
+  });
+
+  it("rejects other function-valued random-community options and invalid seeds", () => {
+    const executeUnchecked = executeSnaTask as unknown as (
+      request: Pick<SnaWorkerRequest, "fn" | "payload" | "options">,
+    ) => unknown;
+    expect(() => executeUnchecked({
+      fn: "louvain",
+      payload: { input: cycle },
+      options: { customCallback: () => 0.5 },
+    })).toThrow(/customCallback.*structured-clone-safe/i);
+    expect(() => executeUnchecked({
+      fn: "leiden",
+      payload: { input: cycle },
+      options: { seed: { value: 17 } },
+    })).toThrow(/seed must be a finite number or string/i);
+    expect(() => executeUnchecked({
+      fn: "infomap",
+      payload: { input: cycle },
+      options: { seed: Number.POSITIVE_INFINITY },
+    })).toThrow(/seed must be a finite number or string/i);
+  });
+
+  it("rejects non-clone-safe random-community options before posting to a Worker", () => {
+    let spawned = false;
+    const client = createSnaWorker(() => {
+      spawned = true;
+      throw new Error("Worker factory must not run for invalid options");
+    });
+    const runUnchecked = client.run.bind(client) as unknown as (
+      fn: SnaWorkerFunction,
+      payload: Record<string, unknown>,
+      options?: Record<string, unknown>,
+    ) => Promise<unknown>;
+
+    expect(() => runUnchecked("louvain", { input: cycle }, { rng: () => 0.5 })).toThrow(/structured-clone-safe seed/i);
+    expect(spawned).toBe(false);
   });
 
   it("bounds Girvan-Newman and batches explicit prediction pairs", () => {
